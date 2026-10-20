@@ -34,3 +34,14 @@ export function programmeState(p: Programme): { label: string; tone: "" | "posit
 }
 
 export const pillClass = (tone: string) => `pill${tone ? ` pill-${tone}` : ""}`;
+
+/** Why a researcher cannot start a reward-bearing report here, or null if they can. */
+export function blockedReason(p: Programme): string | null {
+  if (p.status === "paused") return "Paused by the owner. New reports are not accepted until it resumes.";
+  if (p.status === "closing") return "Closing. Reports already submitted keep their payout window; new ones are not accepted.";
+  if (p.status === "closed") return "Closed. Its reports and payout history stay visible.";
+  if (p.status === "draft") return "Not published yet.";
+  if (balance(p) === 0) return "Escrow is empty. Reward-bearing reports open again when the owner adds funds.";
+  return null;
+}
+
