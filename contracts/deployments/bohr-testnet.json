@@ -1,0 +1,15 @@
+{
+  "network": "Bohr testnet",
+  "chainId": 968,
+  "contract": "SehatEscrow",
+  "address": "0xbC555De32fb45a8FF3297cbbc1a6F50F7674Bb54",
+  "deployTx": "0x807c36b5beac3d5f538e61c57dd0a5a68cfbb16d56bc2d1528716086c3f286e2",
+  "block": 27529541,
+  "gasUsed": 2108528,
+  "deployer": "0x1727eF2a5622B8559Af818A942dBFd59493e175E",
+  "guardian": "0x1727eF2a5622B8559Af818A942dBFd59493e175E",
+  "compiler": "solc 0.8.28, optimizer 10000 runs, evm cancun",
+  "verified": "https://scan.bohr.life/address/0xbC555De32fb45a8FF3297cbbc1a6F50F7674Bb54",
+  "deployedOn": "2026-10-20",
+  "notes": "Testnet. Guardian is the deployer for now; move it to a multisig with transferGuardian before any real use."
+}

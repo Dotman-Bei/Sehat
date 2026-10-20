@@ -20,7 +20,12 @@ contract Deploy is Script {
         require(chainId == 968 || chainId == 677 || chainId == 31337, "unexpected chain: expected Bohr 968, BOT 677 or local");
 
         // PRIVATE_KEY from contracts/.env (git-ignored) if set; otherwise the --account keystore.
-        uint256 pk = vm.envOr("PRIVATE_KEY", uint256(0));
+        // Accepts the key with or without the 0x prefix.
+        string memory raw = vm.envOr("PRIVATE_KEY", string(""));
+        uint256 pk;
+        if (bytes(raw).length == 64) pk = vm.parseUint(string.concat("0x", raw));
+        else if (bytes(raw).length == 66) pk = vm.parseUint(raw);
+        else require(bytes(raw).length == 0, "PRIVATE_KEY must be 64 hex characters, with or without 0x");
         if (pk != 0) {
             console.log("deployer", vm.addr(pk));
             vm.startBroadcast(pk);
