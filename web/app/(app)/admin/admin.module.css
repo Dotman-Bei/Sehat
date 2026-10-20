@@ -1,9 +1,12 @@
 /* 1320 canvas: queue 7fr + metrics 5fr = 763 + 16 + 541. */
 .lead { display: grid; grid-template-columns: 7fr 5fr; gap: var(--gap); align-items: start; }
+.queuePanel { display: flex; flex-direction: column; }
+.foot { margin-top: 0; padding-top: 14px; border-top: 1px solid var(--rule); color: var(--muted); font-size: 13px; }
 
 .queue { display: grid; }
 .item { padding: 16px 0; border-top: 1px solid var(--rule); display: grid; gap: 10px; }
 .item:first-child { border-top: 0; padding-top: 0; }
+.queue { margin-bottom: 16px; }
 .itemHead { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .kind { margin-left: 10px; color: var(--muted); font-size: 12px; font-weight: 400; }
 .link { text-decoration: underline; text-decoration-color: #4a4a4a; text-underline-offset: 3px; }

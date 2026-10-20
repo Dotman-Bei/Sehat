@@ -102,7 +102,7 @@ export default function Admin() {
       {title}
 
       <div className={s.lead}>
-        <section className="panel" aria-labelledby="queue-h">
+        <section className={`panel ${s.queuePanel}`} aria-labelledby="queue-h">
           <div className="panel-head">
             <h2 id="queue-h">Abuse reports</h2>
             <span className="panel-meta">Oldest first</span>
@@ -168,11 +168,10 @@ export default function Admin() {
               ))}
             </ul>
           )}
-          {hidden.length > 0 && (
-            <p className={s.note} style={{ marginTop: 12 }}>
-              Hidden today: {hidden.map(targetLabel).join(", ")}.
-            </p>
-          )}
+          <p className={s.foot}>
+            Hidden from the directory: {hidden.length ? hidden.map(targetLabel).join(", ") : "none"}. Hidden programmes keep their escrow,
+            reports and payouts.
+          </p>
         </section>
 
         <div className="stack">
