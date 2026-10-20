@@ -1,0 +1,5 @@
+node_modules/
+.next/
+.taste-skill/inspect/
+*.log
+.env*
