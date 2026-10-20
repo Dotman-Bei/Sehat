@@ -48,8 +48,8 @@ export const ESCROW_DEPLOY_BLOCK = BigInt(process.env.NEXT_PUBLIC_SEHAT_ESCROW_B
 
 /** Programmes, balances and escrow events come from the contract. */
 export const CHAIN_LIVE = /^0x[0-9a-fA-F]{40}$/.test(ESCROW_ADDRESS);
-/** Reports, threads and triage come from the private reports API. Not built yet. */
-export const REPORTS_LIVE = false;
+/** Reports, threads and triage come from the private reports API (needs the chain to be live). */
+export const REPORTS_LIVE = CHAIN_LIVE && process.env.NEXT_PUBLIC_SEHAT_REPORTS === "live";
 
 /** Sample programmes and balances are shown (no escrow configured). */
 export const PREVIEW_DATA = !CHAIN_LIVE;

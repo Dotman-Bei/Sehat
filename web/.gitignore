@@ -42,3 +42,5 @@ next-env.d.ts
 .next-build/
 .next-live/
 .next-fork/
+.data/
+.next-test/

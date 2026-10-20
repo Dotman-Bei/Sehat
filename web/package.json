@@ -7,17 +7,19 @@
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
-    "test:chain": "sh scripts/test-chain.sh"
+    "test:chain": "sh scripts/test-chain.sh",
+    "test:reports": "sh scripts/test-reports.sh"
   },
   "dependencies": {
     "next": "15.5.28",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "server-only": "^0.0.1",
     "viem": "^2.57.7"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@types/node": "^20",
+    "@types/node": "^22.20.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

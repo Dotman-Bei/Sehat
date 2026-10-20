@@ -5,7 +5,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { keccak256, type Hex } from "viem";
-import { CHAIN_LIVE } from "./config";
+import { CHAIN_LIVE, REPORTS_LIVE } from "./config";
 import { type ChainEvent, type RawProgramme, isoDate, readAllProgrammes, readEvents, readProgramme, toBot } from "./chain";
 import { PROGRAMMES, SEVERITIES, type Programme, type ProgrammeStatus, type Severity, getProgramme } from "./sample-data";
 
@@ -26,6 +26,11 @@ type Metadata = {
 
 async function loadMetadataBytes(uri: string): Promise<Uint8Array | null> {
   try {
+    if (uri.startsWith("data:")) {
+      const m = /^data:[^,]*?(;base64)?,([\s\S]*)$/.exec(uri);
+      if (!m) return null;
+      return new Uint8Array(m[1] ? Buffer.from(m[2], "base64") : Buffer.from(decodeURIComponent(m[2]), "utf8"));
+    }
     if (uri.startsWith("/")) {
       // Served by this app from /public. Resolve inside public/ only.
       const root = path.join(process.cwd(), "public");
@@ -126,7 +131,12 @@ async function toProgramme(raw: RawProgramme, events: ChainEvent[], latestBlock:
 export async function listProgrammes(): Promise<Programme[]> {
   if (!CHAIN_LIVE) return PROGRAMMES;
   const [raws, { events, latestBlock, latestTime }] = await Promise.all([readAllProgrammes(), readEvents()]);
-  return Promise.all(raws.map((r) => toProgramme(r, events, latestBlock, latestTime)));
+  const all = await Promise.all(raws.map((r) => toProgramme(r, events, latestBlock, latestTime)));
+  if (!REPORTS_LIVE) return all;
+  // Programmes hidden by moderation leave the directory; their pages and escrow stay reachable.
+  const { hiddenProgrammeIds } = await import("@/server/moderation");
+  const hidden = new Set(hiddenProgrammeIds());
+  return all.filter((p) => !hidden.has(p.onChain!.programmeId));
 }
 
 export async function findProgramme(id: string): Promise<Programme | undefined> {
