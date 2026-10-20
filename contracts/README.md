@@ -75,12 +75,18 @@ Network values were checked on 2026-10-20 against the
 Bohr testnet is chain 968 at `https://rpc.bohr.life`, with Blockscout at `https://scan.bohr.life`.
 The node supports Cancun opcodes. Recheck all of this before each deployment.
 
-1. Create an encrypted keystore. Never use a raw private key:
-   `cast wallet import sehat-deployer --interactive`
+1. Give the script a signer, using a wallet made only for deploying and holding only testnet BOT:
+   - `PRIVATE_KEY` and `GUARDIAN` in `contracts/.env` (git-ignored; template in `.env.example`), or
+   - an encrypted keystore: `cast wallet import sehat-deployer --interactive`
 2. Fund it from the faucet at https://faucet.botchain.ai/basic. Deployment needs about 0.055 BOT
    at 20 gwei (simulated against Bohr).
 3. Deploy and verify:
    ```sh
+   # with contracts/.env
+   forge script script/Deploy.s.sol --rpc-url bohr --broadcast \
+     --verify --verifier blockscout --verifier-url https://scan.bohr.life/api/
+
+   # or with the keystore
    GUARDIAN=0xYourGuardian forge script script/Deploy.s.sol --rpc-url bohr \
      --account sehat-deployer --broadcast \
      --verify --verifier blockscout --verifier-url https://scan.bohr.life/api/
