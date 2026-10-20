@@ -1,0 +1,62 @@
+/* 1320 canvas. Lead row: 7fr escrow + 5fr release = 763 + 16 + 541. Lower row: 1fr + 1fr. */
+.lead { display: grid; grid-template-columns: 7fr 5fr; gap: var(--gap); align-items: stretch; }
+.lead > :global(.panel) { display: flex; flex-direction: column; }
+.sub { color: var(--muted); margin-top: 4px; }
+.track { margin-top: 20px; height: 10px; }
+.hatch { display: block; background: #8c8c8c; -webkit-mask: repeating-linear-gradient(135deg, #000 0 2px, transparent 2px 5px); mask: repeating-linear-gradient(135deg, #000 0 2px, transparent 2px 5px); } /* taste-skill-ignore: a hatch mask marks agreed-but-unpaid */
+.legendTable { margin-top: 12px; }
+.legendTable td { padding: 7px 0; }
+.legendTable tr:first-child td { border-top: 0; }
+.legendTable i { display: inline-block; width: 10px; height: 10px; margin-right: 10px; vertical-align: -1px; }
+.swPaid { background: #5c5c5c; }
+.swAgreed { background: #8c8c8c; -webkit-mask: repeating-linear-gradient(135deg, #000 0 2px, transparent 2px 5px); mask: repeating-linear-gradient(135deg, #000 0 2px, transparent 2px 5px); } /* taste-skill-ignore: legend swatch is the hatch itself */
+.swFree { background: var(--accent); }
+.topUp { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 20px; }
+.topUp :global(.input) { width: 180px; }
+.txLine { display: flex; align-items: center; gap: 8px; color: var(--muted); flex-basis: 100%; }
+.preview { color: var(--notice); font-size: 12px; flex-basis: 100%; }
+
+.releaseList li { display: flex; justify-content: space-between; gap: 16px; padding: 4px 0 16px; }
+.releaseRight { display: grid; justify-items: end; gap: 8px; flex: none; }
+.recent { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--rule); }
+.h3 { font-size: 13px; font-weight: 500; color: var(--muted); margin-bottom: 8px; }
+
+.sectionHead { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 4px; }
+.sectionHead h2 { font-size: 18px; font-weight: 600; }
+.queue { margin-top: 8px; }
+.ident { width: 46%; }
+.queue :global(.btn) { height: 30px; }
+.narrow { display: none; }
+.phonePill { display: none !important; }
+
+.lower { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); align-items: stretch; }
+.lower > :global(.panel) { display: flex; flex-direction: column; }
+.seg { display: inline-flex; gap: 2px; padding: 2px; background: var(--raised); border-radius: 8px; margin-bottom: 4px; }
+.segBtn { position: relative; border: 0; background: none; color: var(--muted); padding: 7px 14px; border-radius: 6px; font-weight: 500; }
+.segBtn[aria-checked="true"] { color: var(--text); background: var(--surface); }
+.segBtn[aria-checked="true"]::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: 4px; height: 1px; background: var(--accent-text); }
+.segBtn:disabled { cursor: not-allowed; }
+.confirmBox { margin-top: 12px; padding: 14px; border: 1px solid var(--control); border-radius: var(--radius-control); display: grid; gap: 12px; }
+.confirmActions { display: flex; gap: 8px; justify-content: flex-end; }
+.closure { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--rule); }
+.seg + p, .confirmBox { margin-bottom: 20px; }
+
+.people li { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--rule); }
+.people li:first-child { border-top: 0; padding-top: 0; }
+.people li > span:nth-child(2) { display: grid; }
+.addRow { display: flex; gap: 8px; margin-top: 12px; }
+.addRow :global(.input) { flex: 1; min-width: 0; }
+
+@media (max-width: 1100px) {
+  .lead, .lower { grid-template-columns: minmax(0, 1fr); }
+  .queue th:nth-child(2), .queue td:nth-child(2) { display: none; }
+  .narrow { display: inline; }
+}
+@media (max-width: 760px) {
+  .queue th:nth-child(4), .queue td:nth-child(4), .queue th:nth-child(3), .queue td:nth-child(3) { display: none; }
+  .phonePill { display: inline-flex !important; margin-left: 8px; vertical-align: 1px; }
+  .ident { width: auto; }
+  .releaseList li { flex-direction: column; }
+  .releaseRight { justify-items: start; }
+  .topUp :global(.input) { flex: 1; width: auto; }
+}
