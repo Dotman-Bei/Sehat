@@ -417,8 +417,8 @@ export default function Manage({ programId }: { programId: string }) {
             <dd className="num">0 BOT</dd>
           </dl>
           <p className={s.sub}>
-            Withdrawal of unused escrow opens only after closing, once the {p.closingWindowDays}-day window ends with no report unresolved. It is disabled
-            until then.
+            Unused escrow can be withdrawn only after closing, once the {p.closingWindowDays}-day window has ended. The contract cannot see
+            reports, so resolve and pay every accepted one before the window ends.
           </p>
         </section>
 

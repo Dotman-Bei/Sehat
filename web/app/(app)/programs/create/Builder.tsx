@@ -62,7 +62,13 @@ export default function Builder() {
     Scope: scope.some((t) => !t.target.trim()) || scope.length === 0 ? "Every in-scope row needs a target." : null,
     Rules: rules.trim().length < 40 ? "Write the rules of engagement." : !/^\d+$/.test(disclosureDays) ? "Set the disclosure window in days." : null,
     Rewards: tierErrors.some(Boolean) ? "Complete every severity's range." : null,
-    Dates: !start ? "Set a start date." : end && end <= start ? "The end date must come after the start." : null,
+    Dates: !start
+      ? "Set a start date."
+      : end && end <= start
+        ? "The end date must come after the start."
+        : !/^\d+$/.test(closing) || num(closing) < 7 || num(closing) > 365
+          ? "The closing window must be 7 to 365 days."
+          : null,
     Review: null,
     Register: register.phase !== "done" ? "Register the programme on-chain." : null,
     Fund: fund.phase !== "done" ? "Funding is not confirmed yet." : null,
@@ -211,7 +217,7 @@ export default function Builder() {
               <F label="Closing window (days)" id="d-close">
                 <input id="d-close" className="input num" inputMode="numeric" value={closing} onChange={(e) => setClosing(e.target.value)} style={{ maxWidth: 160 }} />
               </F>
-              <p className={s.hint}>Unused escrow can be withdrawn only after the closing window ends with no report left unresolved.</p>
+              <p className={s.hint}>Between 7 and 365 days, fixed once registered. Unused escrow can be withdrawn only after the window ends; rewards can be paid until then.</p>
             </Row>
           )}
 

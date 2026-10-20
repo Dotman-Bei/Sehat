@@ -274,9 +274,9 @@ interface element enlarged, cropped by two edges, with a name and one line:
 - **Who can read my report?** The programme owner, the triagers they authorise, and platform
   operators under documented access rules. Reports are stored privately with an access check on
   every read. They are not end-to-end encrypted.
-- **What happens when a programme closes?** Open reports keep a payout window. Unused escrow can
-  return to the owner only after the close conditions in the contract are met; until safe closure
-  ships, withdrawal stays disabled.
+- **What happens when a programme closes?** Closing stops new reports and starts a closing window,
+  fixed when the programme was registered and never shorter than 7 days. Rewards can still be paid
+  during it. Unused escrow returns to the owner only after it ends.
 - **Can Sehat staff move escrow?** No. Admins can hide a programme from the directory for abuse.
   They cannot withdraw escrow or redirect a payout.
 - **Which network and token?** BOT Chain mainnet (chain 677) and Bohr testnet (chain 968), paid in
@@ -401,7 +401,7 @@ Question: *What needs triage, and can escrow cover what we have agreed?*
   action ("Triage").
 - Awaiting release: agreed rewards with **Release**.
 - Status: Active / Paused / Closing control, closure panel showing eligible unused balance
-  ("Withdrawal disabled until the closing window ends on 2026-12-01").
+  ("Withdrawal opens only after the closing window ends; the contract cannot see unresolved reports").
 - Triagers: list with initials discs, Add triager.
 
 ### 4.9 Platform admin — `/admin` (queue)

@@ -101,7 +101,7 @@ const FAQ: [string, string][] = [
   ],
   [
     "What happens when a programme closes?",
-    "Open reports keep a payout window. Unused escrow can return to the owner only after the close conditions in the contract are met; until safe closure ships, withdrawal stays disabled.",
+    "Closing stops new reports and starts a closing window, fixed when the programme was registered and never shorter than 7 days. Rewards can still be paid during it. Unused escrow returns to the owner only after it ends.",
   ],
   [
     "Can Sehat staff move escrow?",
