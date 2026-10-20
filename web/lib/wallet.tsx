@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { ACTIVE_NETWORK, PREVIEW_DATA } from "./config";
+import { ACTIVE_NETWORK, REPORTS_LIVE } from "./config";
 import { ADMIN_WALLET, QUAYSIDE_OWNER, RESEARCHER } from "./sample-data";
 
 type Eip1193 = {
@@ -18,8 +18,8 @@ declare global {
 
 export type PreviewIdentity = { label: string; address: string; note: string };
 
-/** Preview identities exist only while the build shows sample data. They are labelled as such everywhere. */
-export const PREVIEW_IDENTITIES: PreviewIdentity[] = PREVIEW_DATA
+/** Preview identities exist only while reports are sample data. They are labelled as such everywhere. */
+export const PREVIEW_IDENTITIES: PreviewIdentity[] = !REPORTS_LIVE
   ? [
       { label: "Researcher", address: RESEARCHER, note: "7 sample reports" },
       { label: "Quayside owner", address: QUAYSIDE_OWNER, note: "Owns Quayside Bridge" },

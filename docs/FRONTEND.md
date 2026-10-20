@@ -460,3 +460,14 @@ Generic patterns the skill bans, and the Sehat-specific temptations behind them:
 - **Preview identities.** While `NEXT_PUBLIC_SEHAT_ESCROW` is unset the app shows sample data,
   a notice line on every app screen, and preview identities in the wallet menu (or `?as=…`).
   Setting the escrow address turns all of this off.
+- **Chain-live mode** (escrow address configured). The directory, programme pages, owner management
+  and admin chain metrics read the escrow contract on Bohr testnet. The notice line says reports are
+  still sample data. Live screens never offer sample identities, and test programmes carry a
+  "Test programme" pill and take no reports. A programme whose metadata fails its on-chain hash shows
+  "Metadata does not match its on-chain hash" or "Metadata unavailable" instead of invented details.
+- **Owner actions are transactions.** Resume, pause, closing, add funds and withdraw each show
+  "Confirm in your wallet…", then "Waiting for the receipt · hash", then the result re-read from the
+  contract, or a plain-language refusal.
+- **Builder, live.** Register shows the metadata hash, a download of the exact metadata file and a
+  field for its hosted address. Publish is a link to the programme page: a registered, funded
+  programme is listed straight from the contract.

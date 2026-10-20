@@ -1,14 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import ProgrammeTable, { type Row } from "./ProgrammeTable";
-import { PROGRAMMES, acceptsRewards, balance, funded, lastUpdated, maxCritical, paidOut } from "@/lib/sample-data";
+import { acceptsRewards, balance, funded, lastUpdated, maxCritical, paidOut } from "@/lib/sample-data";
+import { listProgrammes } from "@/lib/programmes";
+import { ACTIVE_NETWORK, CHAIN_LIVE } from "@/lib/config";
 import { programmeState } from "@/lib/status";
-import { age, bot } from "@/lib/format";
+import { age, ago, bot } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Programmes · Sehat" };
+// Balances come from the escrow contract on every request.
+export const dynamic = "force-dynamic";
 
-export default function ProgrammesPage() {
-  const rows: Row[] = PROGRAMMES.map((p) => ({
+export default async function ProgrammesPage() {
+  const programmes = await listProgrammes();
+  const rows: Row[] = programmes.map((p) => ({
     id: p.id,
     project: p.project,
     title: p.title,
@@ -22,10 +27,11 @@ export default function ProgrammesPage() {
     updated: lastUpdated(p),
     updatedAge: age(lastUpdated(p)),
     accepting: acceptsRewards(p),
+    test: !!p.test,
   }));
   const accepting = rows.filter((r) => r.accepting);
   const total = rows.reduce((t, r) => t + r.escrow, 0);
-  const newest = [...PROGRAMMES].sort((a, b) => b.startDate.localeCompare(a.startDate))[0];
+  const newest = [...programmes].sort((a, b) => b.startDate.localeCompare(a.startDate))[0];
 
   return (
     <>
@@ -33,9 +39,12 @@ export default function ProgrammesPage() {
         <div>
           <h1>Programmes</h1>
           <p className="subline">
-            <strong>{accepting.length} of {rows.length}</strong> accept reward-bearing reports, with{" "}
-            <strong className="num">{bot(total)} BOT</strong> in escrow. {newest.project} opened{" "}
-            {age(newest.startDate).toLowerCase()} ago.
+            <strong>
+              {accepting.length} of {rows.length}
+            </strong>{" "}
+            accept reward-bearing reports, with <strong className="num">{bot(total)} BOT</strong> in escrow
+            {CHAIN_LIVE ? ` on ${ACTIVE_NETWORK.name}` : ""}.
+            {newest && ` ${newest.project} opened ${ago(newest.startDate)}.`}
           </p>
         </div>
         <div className="title-actions">

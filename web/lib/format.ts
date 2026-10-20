@@ -10,7 +10,10 @@ export const signed = (n: number) => (n > 0 ? "+" : n < 0 ? "−" : "") + nf.for
 export const short = (hex: string, head = 4, tail = 4) =>
   hex.length <= head + tail + 3 ? hex : `${hex.slice(0, 2 + head)}…${hex.slice(-tail)}`;
 
-export const TODAY = "2026-10-20";
+import { CHAIN_LIVE } from "./config";
+
+// Sample data is written relative to 2026-10-20; live chain data uses the real date.
+export const TODAY = CHAIN_LIVE ? new Date().toISOString().slice(0, 10) : "2026-10-20";
 
 const DAY = 86_400_000;
 export const daysAgo = (iso: string, today = TODAY) =>
@@ -24,6 +27,12 @@ export const age = (iso: string, today = TODAY) => {
   if (d < 14) return `${d} days`;
   if (d < 60) return `${Math.round(d / 7)} weeks`;
   return `${Math.round(d / 30)} months`;
+};
+
+/** "today", "yesterday", "3 days ago" */
+export const ago = (iso: string, today = TODAY) => {
+  const a = age(iso, today);
+  return a === "Today" ? "today" : a === "Yesterday" ? "yesterday" : `${a} ago`;
 };
 
 /** Initials for a person disc: "Kemi Okafor" → "KO" */

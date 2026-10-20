@@ -6,13 +6,15 @@ import ConnectPrompt from "@/components/app/ConnectPrompt";
 import Hash from "@/components/app/Hash";
 import { useWallet } from "@/lib/wallet";
 import { SEVERITIES, type Severity, fakeHex } from "@/lib/sample-data";
-import { ACTIVE_NETWORK, PREVIEW_DATA, txUrl } from "@/lib/config";
+import { ACTIVE_NETWORK, CHAIN_LIVE, PREVIEW_DATA, txUrl } from "@/lib/config";
+import { keccak256, type Hex } from "viem";
+import { browserSender, explainError, fundProgramme, registerProgramme } from "@/lib/tx";
 import { bot, TODAY } from "@/lib/format";
 import s from "./create.module.css";
 
 type Target = { target: string; kind: string; note: string };
 type TierRow = { severity: Severity; min: string; max: string };
-type Phase = "idle" | "wallet" | "pending" | "done";
+type Phase = "idle" | "wallet" | "pending" | "done" | "failed";
 
 const STEPS = ["Basics", "Scope", "Rules", "Rewards", "Dates", "Review", "Register", "Fund", "Publish"] as const;
 type Step = (typeof STEPS)[number];
@@ -43,8 +45,9 @@ export default function Builder() {
   const [start, setStart] = useState(TODAY);
   const [end, setEnd] = useState("");
   const [closing, setClosing] = useState("30");
-  const [register, setRegister] = useState<{ phase: Phase; hash?: string }>({ phase: "idle" });
-  const [fund, setFund] = useState<{ phase: Phase; hash?: string; amount?: number }>({ phase: "idle" });
+  const [register, setRegister] = useState<TxState & { programmeId?: number }>({ phase: "idle" });
+  const [fund, setFund] = useState<TxState & { amount?: number }>({ phase: "idle" });
+  const [metadataUrl, setMetadataUrl] = useState("");
   const [amount, setAmount] = useState("");
   const [published, setPublished] = useState(false);
 
@@ -90,7 +93,7 @@ export default function Builder() {
     return fund.phase === "done";
   };
 
-  function runTx(set: (v: { phase: Phase; hash?: string; amount?: number }) => void, seed: string, extra: { amount?: number } = {}) {
+  function runTx(set: (v: TxState & { amount?: number }) => void, seed: string, extra: { amount?: number } = {}) {
     set({ phase: "wallet", ...extra });
     setTimeout(() => {
       const hash = fakeHex(seed + Date.now());
@@ -99,10 +102,63 @@ export default function Builder() {
     }, 900);
   }
 
+  // ---- live chain: public metadata, registration and funding --------------------------------
+  const metadataJson = JSON.stringify(
+    {
+      schema: "sehat.programme/1",
+      project: project.trim(),
+      title: title.trim(),
+      summary: summary.trim(),
+      scope: scope.filter((t) => t.target.trim()),
+      outOfScope: outScope.filter((t) => t.target.trim()),
+      tiers: tiers.map((t) => ({ severity: t.severity, min: String(num(t.min)), max: String(num(t.max)) })),
+      rules: rules.split("\n").map((r) => r.trim()).filter(Boolean),
+      automatedScanning: scanning.trim(),
+      disclosure: `${disclosureDays} days from the first report.`,
+      duplicates: "The earliest complete report wins.",
+      start,
+      end: end || null,
+      triagers: [],
+    },
+    null,
+    2,
+  );
+  const metadataHash = keccak256(new TextEncoder().encode(metadataJson));
+  const metadataUrlOk = /^(https:\/\/|ipfs:\/\/)\S+$/.test(metadataUrl.trim());
+  const downloadHref = `data:application/json;charset=utf-8,${encodeURIComponent(metadataJson)}`;
+
+  async function liveTx<T>(set: (v: TxState) => void, run: (onHash: (h: string) => void) => Promise<T>): Promise<T | null> {
+    let hash: string | undefined;
+    try {
+      set({ phase: "wallet" });
+      const out = await run((h) => {
+        hash = h;
+        set({ phase: "pending", hash: h });
+      });
+      return out;
+    } catch (e) {
+      set({ phase: "failed", hash, error: explainError(e) });
+      return null;
+    }
+  }
+
+  async function doRegister() {
+    if (!CHAIN_LIVE) return runTx(setRegister, "register");
+    const r = await liveTx(setRegister, (onHash) => registerProgramme(browserSender(w.address!), metadataHash as Hex, metadataUrl.trim(), num(closing), onHash));
+    if (r) setRegister({ phase: "done", hash: r.receipt.transactionHash, programmeId: r.programmeId });
+  }
+
+  async function doFund() {
+    if (!CHAIN_LIVE) return runTx(setFund, "fund", { amount: fundN });
+    const amountText = amount.replace(/[,\s]/g, "");
+    const r = await liveTx((v) => setFund({ ...v, amount: fundN }), (onHash) => fundProgramme(browserSender(w.address!), register.programmeId!, amountText, onHash));
+    if (r) setFund({ phase: "done", hash: r.transactionHash, amount: fundN });
+  }
+
   const next = () => setStep(STEPS[Math.min(idx + 1, STEPS.length - 1)]);
   const back = () => setStep(STEPS[Math.max(idx - 1, 0)]);
   const fundN = num(amount);
-  const fundError = amount && (!Number.isFinite(fundN) || fundN <= 0) ? "Enter an amount in whole BOT." : null;
+  const fundError = amount && (!Number.isFinite(fundN) || fundN <= 0) ? "Enter an amount in BOT." : null;
 
   return (
     <>
@@ -256,16 +312,43 @@ export default function Builder() {
           {step === "Register" && (
             <Row title="Register on-chain" help="Creates the programme in the escrow contract with your wallet as owner. Only non-sensitive metadata and a content hash are written.">
               {!w.address ? (
-                <ConnectPrompt sentence="Connect the wallet that will own this programme. It alone can release rewards and close the programme." preview="Quayside owner" />
+                <ConnectPrompt sentence="Connect the wallet that will own this programme. It alone can release rewards and close the programme." preview={CHAIN_LIVE ? undefined : "Quayside owner"} />
               ) : (
-                <TxBlock
-                  phase={register.phase}
-                  hash={register.hash}
-                  action="Register programme"
-                  doneText="Registered. The programme exists on-chain but holds no escrow, so it is not visible to researchers."
-                  disabled={w.wrongChain}
-                  onRun={() => runTx(setRegister, "register")}
-                />
+                <>
+                  {CHAIN_LIVE && register.phase !== "done" && (
+                    <div className={s.metaBox}>
+                      <p className={s.hint}>
+                        The contract stores only a hash of your public programme details. Host this exact file where researchers can fetch it,
+                        then give its address. Sehat checks the file against the hash before showing it.
+                      </p>
+                      <dl className="kv">
+                        <dt>Metadata hash</dt>
+                        <dd className="num">
+                          <Hash value={metadataHash} head={8} tail={6} />
+                        </dd>
+                      </dl>
+                      <a className="btn" href={downloadHref} download={`sehat-programme-${metadataHash.slice(2, 10)}.json`} style={{ justifySelf: "start" }}>
+                        Download metadata file
+                      </a>
+                      <F label="Metadata address" id="r-url" hint="https:// or ipfs:// address of the downloaded file, unchanged.">
+                        <input id="r-url" className="input" value={metadataUrl} onChange={(e) => setMetadataUrl(e.target.value)} placeholder="https://…/programme.json" aria-invalid={!!metadataUrl && !metadataUrlOk} />
+                      </F>
+                    </div>
+                  )}
+                  <TxBlock
+                    phase={register.phase}
+                    hash={register.hash}
+                    error={register.error}
+                    action="Register programme"
+                    doneText={
+                      CHAIN_LIVE && register.programmeId
+                        ? `Registered as programme ${register.programmeId}. It holds no escrow yet, so researchers cannot submit to it.`
+                        : "Registered. The programme exists on-chain but holds no escrow, so it is not visible to researchers."
+                    }
+                    disabled={w.wrongChain || (CHAIN_LIVE && !metadataUrlOk)}
+                    onRun={doRegister}
+                  />
+                </>
               )}
             </Row>
           )}
@@ -273,11 +356,11 @@ export default function Builder() {
           {step === "Fund" && (
             <Row title="Fund escrow" help="Native BOT, sent to the escrow contract with a payable call. The balance shown everywhere is read from the contract, never typed in.">
               {fund.phase === "done" ? (
-                <TxBlock phase="done" hash={fund.hash} action="" doneText={`Funded with ${bot(fund.amount ?? 0)} BOT. Escrow reads ${bot(fund.amount ?? 0)} BOT.`} onRun={() => {}} />
+                <TxBlock phase="done" hash={fund.hash} action="" doneText={`Funded with ${bot(fund.amount ?? 0)} BOT.`} onRun={() => {}} />
               ) : (
                 <>
                   <F label="Amount (BOT)" id="f-amount" hint={critMax ? `Your Critical tier pays up to ${bot(critMax)} BOT.` : undefined}>
-                    <input id="f-amount" className="input num" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="e.g. 50,000" style={{ maxWidth: 240 }} aria-invalid={!!fundError} />
+                    <input id="f-amount" className="input num" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="e.g. 50,000" style={{ maxWidth: 240 }} aria-invalid={!!fundError} />
                   </F>
                   {fundError && <p className={s.err}>{fundError}</p>}
                   {!fundError && fundN > 0 && critMax > fundN && (
@@ -288,10 +371,11 @@ export default function Builder() {
                   <TxBlock
                     phase={fund.phase}
                     hash={fund.hash}
+                    error={fund.error}
                     action={fundN > 0 && !fundError ? `Fund ${bot(fundN)} BOT` : "Fund escrow"}
                     doneText=""
                     disabled={!(fundN > 0) || !!fundError || w.wrongChain}
-                    onRun={() => runTx(setFund, "fund", { amount: fundN })}
+                    onRun={doFund}
                   />
                 </>
               )}
@@ -300,7 +384,20 @@ export default function Builder() {
 
           {step === "Publish" && (
             <Row title="Publish" help="Lists the programme in the directory and opens it to reports.">
-              {published ? (
+              {CHAIN_LIVE ? (
+                <div className={s.doneBox}>
+                  <p className="cell-main">
+                    {project} {title} is listed as programme {register.programmeId}.
+                  </p>
+                  <p className={s.hint}>
+                    A registered, funded programme appears in the directory straight from the contract. There is no separate publish
+                    transaction.
+                  </p>
+                  <Link className="btn btn-primary" href={`/programs/${register.programmeId}`} style={{ justifySelf: "start" }}>
+                    Open the programme page
+                  </Link>
+                </div>
+              ) : published ? (
                 <div className={s.doneBox}>
                   <p className="cell-main">
                     {project} {title} is live.
@@ -389,7 +486,9 @@ function Targets({ rows, setRows, withKind }: { rows: Target[]; setRows: (r: Tar
   );
 }
 
-function TxBlock({ phase, hash, action, doneText, disabled, onRun }: { phase: Phase; hash?: string; action: string; doneText: string; disabled?: boolean; onRun: () => void }) {
+type TxState = { phase: Phase; hash?: string; error?: string };
+
+function TxBlock({ phase, hash, error, action, doneText, disabled, onRun }: { phase: Phase; hash?: string; error?: string; action: string; doneText: string; disabled?: boolean; onRun: () => void }) {
   if (phase === "done") {
     return (
       <div className={s.doneBox}>
@@ -401,19 +500,26 @@ function TxBlock({ phase, hash, action, doneText, disabled, onRun }: { phase: Ph
       </div>
     );
   }
-  if (phase === "idle") {
+  if (phase === "idle" || phase === "failed") {
     return (
-      <button className="btn btn-primary" onClick={onRun} disabled={disabled} style={{ justifySelf: "start" }}>
-        {action}
-      </button>
+      <>
+        <button className="btn btn-primary" onClick={onRun} disabled={disabled} style={{ justifySelf: "start" }}>
+          {phase === "failed" ? `Try again: ${action.toLowerCase()}` : action}
+        </button>
+        {phase === "failed" && (
+          <p className={s.err} style={{ textAlign: "left" }}>
+            {error} {hash && <Hash value={hash} href={txUrl(hash)} />}
+          </p>
+        )}
+      </>
     );
   }
   return (
     <ol className={s.txSteps} aria-live="polite">
       <li data-state={phase === "wallet" ? "now" : "done"}>Confirm in your wallet</li>
-      <li data-state={phase === "pending" ? "now" : "next"}>Waiting for the receipt</li>
+      <li data-state={phase === "pending" ? "now" : "next"}>Waiting for the receipt {hash && <Hash value={hash} href={txUrl(hash)} />}</li>
       <li data-state="next">Confirmed</li>
-      {PREVIEW_DATA && <li className={s.previewNote}>Preview build: no transaction is sent.</li>}
+      {!CHAIN_LIVE && <li className={s.previewNote}>Preview build: no transaction is sent.</li>}
     </ol>
   );
 }

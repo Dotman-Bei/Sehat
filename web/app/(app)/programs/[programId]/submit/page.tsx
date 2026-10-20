@@ -2,23 +2,21 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ReportForm from "./ReportForm";
-import { PROGRAMMES, getProgramme } from "@/lib/sample-data";
+import { findProgramme } from "@/lib/programmes";
 import { blockedReason } from "@/lib/status";
 import { short } from "@/lib/format";
 
 type Params = { programId: string };
 
-export function generateStaticParams() {
-  return PROGRAMMES.map((p) => ({ programId: p.id }));
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
-  const p = getProgramme((await params).programId);
+  const p = await findProgramme((await params).programId);
   return { title: p ? `Report to ${p.project} · Sehat` : "Submit report · Sehat" };
 }
 
 export default async function SubmitPage({ params }: { params: Promise<Params> }) {
-  const p = getProgramme((await params).programId);
+  const p = await findProgramme((await params).programId);
   if (!p) notFound();
   const blocked = blockedReason(p);
 

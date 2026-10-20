@@ -11,7 +11,7 @@ import {
   AUDIT_LOG,
   type AbuseReport,
   type AuditEntry,
-  PROGRAMMES,
+  type Programme,
   REPORTS,
   balance,
   funded,
@@ -19,18 +19,20 @@ import {
   paidOut,
 } from "@/lib/sample-data";
 import { ACCEPTED, OPEN } from "@/lib/status";
+import { CHAIN_LIVE, REPORTS_LIVE } from "@/lib/config";
 import { age, bot, short, TODAY } from "@/lib/format";
 import s from "./admin.module.css";
 
-// Figures computed from the rows. Chain figures come from escrow events; report figures from the reports database.
-const chain = {
-  registered: PROGRAMMES.length,
-  fundedNow: PROGRAMMES.filter((p) => balance(p) > 0).length,
-  owners: new Set(PROGRAMMES.map((p) => p.owner)).size,
-  escrowed: PROGRAMMES.reduce((t, p) => t + funded(p), 0),
-  paid: PROGRAMMES.reduce((t, p) => t + paidOut(p), 0),
-  payouts: PROGRAMMES.flatMap((p) => p.events).filter((e) => e.kind === "paid").length,
-};
+// Chain figures come from contract state and events (or the sample programmes in preview);
+// report figures from the reports database.
+const chainMetrics = (programmes: Programme[]) => ({
+  registered: programmes.length,
+  fundedNow: programmes.filter((p) => balance(p) > 0).length,
+  owners: new Set(programmes.map((p) => p.owner.toLowerCase())).size,
+  escrowed: programmes.reduce((t, p) => t + funded(p), 0),
+  paid: programmes.reduce((t, p) => t + paidOut(p), 0),
+  payouts: programmes.flatMap((p) => p.events).filter((e) => e.kind === "paid").length,
+});
 const db = {
   reports: REPORTS.length,
   open: REPORTS.filter((r) => OPEN.includes(r.status)).length,
@@ -40,7 +42,8 @@ const db = {
 
 const targetLabel = (a: AbuseReport) => (a.targetKind === "programme" ? getProgramme(a.target)?.project ?? a.target : `Report ${a.target}`);
 
-export default function Admin() {
+export default function Admin({ programmes }: { programmes: Programme[] }) {
+  const chain = chainMetrics(programmes);
   const w = useWallet();
   const isAdmin = sameAddress(w.address, ADMIN_WALLET);
   const [queue, setQueue] = useState<AbuseReport[]>(ABUSE_REPORTS);
@@ -208,7 +211,7 @@ export default function Admin() {
           </section>
           <section className="panel" aria-labelledby="db-h">
             <div className="panel-head">
-              <h2 id="db-h">From the reports database</h2>
+              <h2 id="db-h">From the reports database{CHAIN_LIVE && !REPORTS_LIVE ? " (sample)" : ""}</h2>
             </div>
             <dl className={`${s.metrics} ${s.metrics2}`}>
               <div>

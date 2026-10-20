@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { IconBoard, IconFlag, IconHome, IconPlus, IconReports, IconVault, Mark } from "./icons";
-import { ACTIVE_NETWORK, PREVIEW_DATA } from "@/lib/config";
+import { ACTIVE_NETWORK, CHAIN_LIVE, REPORTS_LIVE } from "@/lib/config";
+import { readAllProgrammes } from "@/lib/chain";
 import { PREVIEW_IDENTITIES, sameAddress, useWallet } from "@/lib/wallet";
 import { ADMIN_WALLET, PROGRAMMES, getProgramme, getReport } from "@/lib/sample-data";
 import { short } from "@/lib/format";
@@ -13,7 +14,7 @@ type Crumb = { label: string; href?: string };
 
 function crumbsFor(path: string): Crumb[] {
   const seg = path.split("/").filter(Boolean);
-  const project = (id: string) => getProgramme(id)?.project ?? id;
+  const project = (id: string) => getProgramme(id)?.project ?? (/^\d+$/.test(id) ? `Programme ${id}` : id);
   if (seg[0] === "programs") {
     if (seg[1] === "create") return [{ label: "Programmes", href: "/programs" }, { label: "New programme" }];
     if (seg[1] && seg[2] === "submit")
@@ -36,14 +37,25 @@ function crumbsFor(path: string): Crumb[] {
 export default function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const { address } = useWallet();
-  const owned = PROGRAMMES.find((p) => sameAddress(p.owner, address));
+  const [ownedOnChain, setOwnedOnChain] = useState<string | null>(null);
+  useEffect(() => {
+    if (!CHAIN_LIVE || !address) return setOwnedOnChain(null);
+    let live = true;
+    readAllProgrammes()
+      .then((all) => live && setOwnedOnChain(String(all.find((p) => sameAddress(p.owner, address))?.id ?? "") || null))
+      .catch(() => live && setOwnedOnChain(null));
+    return () => {
+      live = false;
+    };
+  }, [address]);
+  const ownedId = CHAIN_LIVE ? ownedOnChain : PROGRAMMES.find((p) => sameAddress(p.owner, address))?.id;
   const isAdmin = sameAddress(address, ADMIN_WALLET);
 
   const nav = [
     { href: "/programs", label: "Programmes", icon: <IconBoard />, active: path === "/programs" || (/^\/programs\/(?!create)/.test(path)) },
     { href: "/researcher", label: "Your reports", icon: <IconReports />, active: path.startsWith("/researcher") || path.startsWith("/reports") },
     {
-      href: owned ? `/dashboard/programs/${owned.id}` : "/dashboard/programs/quayside-bridge",
+      href: ownedId ? `/dashboard/programs/${ownedId}` : CHAIN_LIVE ? "/programs/create" : "/dashboard/programs/quayside-bridge",
       label: "Your programmes",
       icon: <IconVault />,
       active: path.startsWith("/dashboard"),
@@ -96,10 +108,17 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             <WalletButton />
           </div>
         </header>
-        {PREVIEW_DATA && (
+        {!CHAIN_LIVE ? (
           <p className="notice-line">
             Preview data. Programmes, reports and balances on this build are samples, not contract state.
           </p>
+        ) : (
+          !REPORTS_LIVE && (
+            <p className="notice-line">
+              Programmes and escrow are read live from {ACTIVE_NETWORK.name}. Reports, threads and triage are still sample data until
+              the reports service is connected.
+            </p>
+          )
         )}
         <main className="canvas">{children}</main>
       </div>

@@ -7,17 +7,18 @@ import ConnectPrompt from "@/components/app/ConnectPrompt";
 import Hash from "@/components/app/Hash";
 import { sameAddress, useWallet } from "@/lib/wallet";
 import {
+  type Programme,
   type ProgrammeStatus,
   type Report,
   agreedUnpaid,
   balance,
   fakeHex,
   funded,
-  getProgramme,
   paidOut,
   reportsFor,
 } from "@/lib/sample-data";
-import { PREVIEW_DATA, addressUrl, txUrl } from "@/lib/config";
+import { CHAIN_LIVE, REPORTS_LIVE, addressUrl, txUrl } from "@/lib/config";
+import { type Sender, browserSender, explainError, fundProgramme, setProgrammePaused, startClosing, withdrawUnused } from "@/lib/tx";
 import { age, bot, daysAgo, initials, short } from "@/lib/format";
 import { CLOSED_WITHOUT_REWARD, REPORT_STATUS, pillClass, programmeState } from "@/lib/status";
 import s from "./manage.module.css";
@@ -37,8 +38,10 @@ const DISC_TINTS = [
   { bg: "#2c3524", fg: "#d3e6bf" },
 ];
 
-export default function Manage({ programId }: { programId: string }) {
-  const p = getProgramme(programId)!;
+type Act = { phase: "idle" | "wallet" | "pending" | "done" | "failed"; hash?: string; error?: string };
+const IDLE: Act = { phase: "idle" };
+
+export default function Manage({ programme: p }: { programme: Programme }) {
   const w = useWallet();
   const router = useRouter();
   const isOwner = sameAddress(w.address, p.owner);
@@ -46,15 +49,47 @@ export default function Manage({ programId }: { programId: string }) {
 
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("new");
   const [showAll, setShowAll] = useState(false);
-  const [status, setStatus] = useState<ProgrammeStatus>(p.status);
+  const [localStatus, setLocalStatus] = useState<ProgrammeStatus>(p.status);
+  const status = CHAIN_LIVE ? p.status : localStatus; // live: always the contract's status
   const [pendingStatus, setPendingStatus] = useState<ProgrammeStatus | null>(null);
   const [topUp, setTopUp] = useState("");
-  const [fundTx, setFundTx] = useState<{ phase: "idle" | "wallet" | "pending" | "done"; hash?: string; amount?: number }>({ phase: "idle" });
+  const [fundTx, setFundTx] = useState<Act & { amount?: number }>(IDLE);
+  const [statusTx, setStatusTx] = useState<Act>(IDLE);
+  const [withdrawTx, setWithdrawTx] = useState<Act>(IDLE);
+  const reportsConnected = !CHAIN_LIVE || REPORTS_LIVE;
+
+  /** Live: a real transaction, reported done only after the receipt. Preview: a labelled simulation. */
+  async function act(set: (a: Act) => void, run: (s: Sender, onHash: (h: string) => void) => Promise<unknown>, preview: () => void) {
+    if (!CHAIN_LIVE) {
+      set({ phase: "wallet" });
+      setTimeout(() => {
+        const hash = fakeHex(`preview-${Date.now()}`);
+        set({ phase: "pending", hash });
+        setTimeout(() => {
+          set({ phase: "done", hash });
+          preview();
+        }, 1300);
+      }, 900);
+      return;
+    }
+    let hash: string | undefined;
+    try {
+      set({ phase: "wallet" });
+      await run(browserSender(w.address!), (h) => {
+        hash = h;
+        set({ phase: "pending", hash: h });
+      });
+      set({ phase: "done", hash });
+      router.refresh();
+    } catch (e) {
+      set({ phase: "failed", hash, error: explainError(e) });
+    }
+  }
   const [triagers, setTriagers] = useState(p.triagers);
   const [newTriager, setNewTriager] = useState("");
 
   const reports = reportsFor(p.id);
-  const added = fundTx.phase === "done" ? fundTx.amount ?? 0 : 0;
+  const added = !CHAIN_LIVE && fundTx.phase === "done" ? fundTx.amount ?? 0 : 0;
   const total = funded(p) + added;
   const paid = paidOut(p);
   const left = balance(p) + added;
@@ -99,7 +134,7 @@ export default function Manage({ programId }: { programId: string }) {
     return (
       <>
         {title}
-        <ConnectPrompt sentence={`Connect the ${p.project} owner wallet or a triager wallet to manage this programme.`} preview="Quayside owner" />
+        <ConnectPrompt sentence={`Connect the ${p.project} owner wallet or a triager wallet to manage this programme.`} preview={CHAIN_LIVE ? undefined : "Quayside owner"} />
       </>
     );
   }
@@ -124,17 +159,33 @@ export default function Manage({ programId }: { programId: string }) {
   const topUpN = Number(topUp.replace(/[,\s]/g, ""));
   const state = programmeState({ ...p, status });
 
+  const id = p.onChain?.programmeId ?? 0;
+  const closesAt = p.onChain?.closesAt ?? null;
+  // Judged by the time of the block the page was read at, as the contract does, not the browser clock.
+  const windowOver = closesAt !== null && (p.onChain?.readAtTime ?? 0) >= closesAt;
+  const eligible = CHAIN_LIVE && status === "closing" && windowOver ? left : 0;
+
   function addFunds() {
     const amount = topUpN;
-    setFundTx({ phase: "wallet", amount });
-    setTimeout(() => {
-      const hash = fakeHex(`topup-${amount}`);
-      setFundTx({ phase: "pending", hash, amount });
-      setTimeout(() => {
-        setFundTx({ phase: "done", hash, amount });
-        setTopUp("");
-      }, 1300);
-    }, 900);
+    const amountText = topUp.replace(/[,\s]/g, "");
+    act(
+      (a) => setFundTx({ ...a, amount }),
+      (sender, onHash) => fundProgramme(sender, id, amountText, onHash),
+      () => {},
+    ).then(() => setTopUp(""));
+  }
+
+  function changeStatus(next: ProgrammeStatus) {
+    setPendingStatus(null);
+    act(
+      setStatusTx,
+      (sender, onHash) => (next === "closing" ? startClosing(sender, id, onHash) : setProgrammePaused(sender, id, next === "paused", onHash)),
+      () => setLocalStatus(next),
+    );
+  }
+
+  function withdraw() {
+    act(setWithdrawTx, (sender, onHash) => withdrawUnused(sender, id, p.owner as `0x${string}`, onHash), () => {});
   }
 
   return (
@@ -192,18 +243,18 @@ export default function Manage({ programId }: { programId: string }) {
               </tr>
             </tbody>
           </table>
-          {isOwner ? (
+          {isOwner && (status === "closing" || status === "closed") ? (
+            <p className={s.sub}>{status === "closed" ? "This programme is closed." : "Closing: funding has stopped, payouts continue."}</p>
+          ) : isOwner ? (
             <div className={s.topUp}>
               {fundTx.phase === "wallet" || fundTx.phase === "pending" ? (
-                <p className={s.txLine} aria-live="polite">
-                  {fundTx.phase === "wallet" ? "Confirm in your wallet…" : `Waiting for the receipt · ${short(fundTx.hash ?? "")}`}
-                </p>
+                <TxLine a={fundTx} />
               ) : (
                 <>
                   <label htmlFor="topup" className="visually-hidden">
                     Amount to add in BOT
                   </label>
-                  <input id="topup" className="input num" inputMode="numeric" placeholder="Amount in BOT" value={topUp} onChange={(e) => setTopUp(e.target.value)} />
+                  <input id="topup" className="input num" inputMode="decimal" placeholder="Amount in BOT" value={topUp} onChange={(e) => setTopUp(e.target.value)} />
                   <button className="btn" disabled={!(topUpN > 0)} onClick={addFunds}>
                     Add funds
                   </button>
@@ -214,7 +265,8 @@ export default function Manage({ programId }: { programId: string }) {
                   <span className="pill pill-positive">Funded</span> +{bot(fundTx.amount ?? 0)} BOT · <Hash value={fundTx.hash} href={txUrl(fundTx.hash)} />
                 </p>
               )}
-              {PREVIEW_DATA && fundTx.phase !== "idle" && <p className={s.preview}>Preview build: no transaction is sent.</p>}
+              {fundTx.phase === "failed" && <p className={s.err}>{fundTx.error}</p>}
+              {!CHAIN_LIVE && fundTx.phase !== "idle" && <p className={s.preview}>Preview build: no transaction is sent.</p>}
             </div>
           ) : (
             <p className={s.sub}>Only the owner wallet can add funds or release rewards.</p>
@@ -226,7 +278,9 @@ export default function Manage({ programId }: { programId: string }) {
             <h2 id="release-h">Awaiting release</h2>
             <span className="panel-meta">{awaitingRelease.length}</span>
           </div>
-          {awaitingRelease.length === 0 ? (
+          {!reportsConnected ? (
+            <p className="dash">Rewards are released from an agreed report. That needs the reports service, which is not connected yet.</p>
+          ) : awaitingRelease.length === 0 ? (
             <p className="dash">No agreed rewards are waiting.</p>
           ) : (
             <ul className={s.releaseList}>
@@ -251,11 +305,17 @@ export default function Manage({ programId }: { programId: string }) {
             </ul>
           )}
           <div className={s.recent}>
-            <h3 className={s.h3}>Recent escrow events</h3>
+            <h3 className={s.h3}>
+              Recent escrow events
+              {p.onChain && !p.onChain.historyComplete && " · catching up with the contract; balances above are current"}
+            </h3>
             <ol className="events">
+              {p.events.length === 0 && <li className="dash">No escrow events yet.</li>}
               {[...p.events].reverse().slice(0, 3).map((e) => (
                 <li key={e.tx} className="event">
-                  <span className="what">{e.kind === "funded" ? "Funded" : e.kind === "paid" ? `Paid ${e.reportRef ?? ""}` : "Returned"}</span>
+                  <span className="what">
+                    {e.kind === "funded" ? "Funded" : e.kind === "paid" ? `Paid ${e.reportRef?.startsWith("0x") ? short(e.reportRef) : (e.reportRef ?? "")}` : "Returned"}
+                  </span>
                   <span className="amount">
                     {e.kind === "funded" ? "+" : "−"}
                     {bot(e.amount)} <span className="unit">BOT</span>
@@ -278,6 +338,13 @@ export default function Manage({ programId }: { programId: string }) {
             {reports.length} received · {open.length} open
           </span>
         </div>
+        {!reportsConnected ? (
+          <p className="empty" style={{ marginTop: 8 }}>
+            Reports and triage run through the private reports service, which is not connected to this build yet. The escrow figures and
+            controls on this page are live.
+          </p>
+        ) : (
+        <>
         <div className="tabs" role="tablist" aria-label="Report status">
           {TABS.map((t) => (
             <button key={t.id} role="tab" className="tab" aria-selected={tab === t.id} onClick={() => { setTab(t.id); setShowAll(false); }}>
@@ -355,6 +422,8 @@ export default function Manage({ programId }: { programId: string }) {
             {showAll ? "Show fewer" : `View all ${shownAll.length}`}
           </button>
         )}
+        </>
+        )}
       </section>
 
       <div className={`section-gap ${s.lower}`}>
@@ -370,7 +439,7 @@ export default function Manage({ programId }: { programId: string }) {
                 role="radio"
                 aria-checked={status === st}
                 className={s.segBtn}
-                disabled={!isOwner || status === "closing"}
+                disabled={!isOwner || status === "closing" || status === "closed" || statusTx.phase === "wallet" || statusTx.phase === "pending"}
                 onClick={() => st !== status && setPendingStatus(st)}
               >
                 {st === "active" ? "Active" : st === "paused" ? "Paused" : "Closing"}
@@ -391,31 +460,47 @@ export default function Manage({ programId }: { programId: string }) {
                 </button>
                 <button
                   className={`btn ${pendingStatus === "closing" ? "btn-danger" : "btn-primary"}`}
-                  onClick={() => {
-                    setStatus(pendingStatus);
-                    setPendingStatus(null);
-                  }}
+                  onClick={() => changeStatus(pendingStatus)}
                 >
                   {pendingStatus === "paused" ? "Pause programme" : pendingStatus === "active" ? "Resume programme" : `Close ${p.project}`}
                 </button>
               </div>
             </div>
+          ) : statusTx.phase === "wallet" || statusTx.phase === "pending" ? (
+            <TxLine a={statusTx} />
           ) : (
             <p className={s.sub}>
+              {statusTx.phase === "failed" && <span className={s.err}>{statusTx.error} </span>}
+              {status === "closed" && "Closed. Unused escrow has been withdrawn; the payout history stays on-chain."}
               {status === "active" && "Accepting reports."}
               {status === "paused" && "Paused. No new reports; everything submitted carries on."}
-              {status === "closing" && `Closing. No new reports; ${open.length} open reports keep their payout window.`}
+              {status === "closing" &&
+                (closesAt
+                  ? `Closing. No new reports; rewards can still be paid until ${new Date(closesAt * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC.`
+                  : `Closing. No new reports; ${open.length} open reports keep their payout window.`)}
               {!isOwner && " Only the owner wallet can change this."}
             </p>
           )}
           <dl className={`kv ${s.closure}`}>
             <dt>Open reports</dt>
-            <dd className="num">{open.length}</dd>
+            <dd className="num">{reportsConnected ? open.length : <span className="dash">Not connected</span>}</dd>
             <dt>Closing window</dt>
             <dd className="num">{p.closingWindowDays} days</dd>
             <dt>Eligible to withdraw</dt>
-            <dd className="num">0 BOT</dd>
+            <dd className="num">{bot(eligible)} BOT</dd>
           </dl>
+          {isOwner && eligible > 0 && (
+            <div className={s.topUp}>
+              {withdrawTx.phase === "wallet" || withdrawTx.phase === "pending" ? (
+                <TxLine a={withdrawTx} />
+              ) : (
+                <button className="btn btn-primary" onClick={withdraw}>
+                  Withdraw {bot(eligible)} BOT to the owner wallet
+                </button>
+              )}
+              {withdrawTx.phase === "failed" && <p className={s.err}>{withdrawTx.error}</p>}
+            </div>
+          )}
           <p className={s.sub}>
             Unused escrow can be withdrawn only after closing, once the {p.closingWindowDays}-day window has ended. The contract cannot see
             reports, so resolve and pay every accepted one before the window ends.
@@ -451,7 +536,7 @@ export default function Manage({ programId }: { programId: string }) {
                     <Hash value={t.wallet} />
                   </span>
                 </span>
-                {isOwner ? (
+                {isOwner && reportsConnected ? (
                   <button className="btn btn-text" onClick={() => setTriagers(triagers.filter((x) => x.wallet !== t.wallet))}>
                     Remove
                   </button>
@@ -461,7 +546,12 @@ export default function Manage({ programId }: { programId: string }) {
               </li>
             ))}
           </ul>
-          {isOwner && (
+          {isOwner && !reportsConnected && (
+            <p className={s.sub} style={{ marginTop: 12 }}>
+              Triagers get access to reports through the reports service, which is not connected yet.
+            </p>
+          )}
+          {isOwner && reportsConnected && (
             <form
               className={s.addRow}
               onSubmit={(e) => {
@@ -483,5 +573,13 @@ export default function Manage({ programId }: { programId: string }) {
         </section>
       </div>
     </>
+  );
+}
+
+function TxLine({ a }: { a: Act }) {
+  return (
+    <p className={s.txLine} aria-live="polite">
+      {a.phase === "wallet" ? "Confirm in your wallet…" : <>Waiting for the receipt · {a.hash ? <Hash value={a.hash} href={txUrl(a.hash)} /> : null}</>}
+    </p>
   );
 }

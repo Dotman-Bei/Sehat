@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useWallet } from "@/lib/wallet";
-import { PREVIEW_DATA } from "@/lib/config";
+import { REPORTS_LIVE } from "@/lib/config";
 import { bot } from "@/lib/format";
 import s from "./submit.module.css";
 
@@ -136,7 +136,7 @@ export default function ReportForm({ programme: p }: Props) {
           Only you and the {p.project} team can open this report. Their questions and decisions arrive on your dashboard.
           Nothing has been written to the chain.
         </p>
-        {PREVIEW_DATA && (
+        {!REPORTS_LIVE && (
           <p className={s.previewNote}>Preview build: this report was not sent anywhere. In production it is stored privately with an access check on every read.</p>
         )}
         <div className={s.doneActions}>

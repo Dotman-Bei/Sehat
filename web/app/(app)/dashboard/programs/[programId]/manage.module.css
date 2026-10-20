@@ -60,3 +60,4 @@
   .releaseRight { justify-items: start; }
   .topUp :global(.input) { flex: 1; width: auto; }
 }
+.err { color: var(--negative); font-size: 13px; flex-basis: 100%; }

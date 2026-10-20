@@ -17,7 +17,7 @@ import {
   getProgramme,
   getReport,
 } from "@/lib/sample-data";
-import { ACTIVE_NETWORK, PREVIEW_DATA, txUrl } from "@/lib/config";
+import { ACTIVE_NETWORK, REPORTS_LIVE, txUrl } from "@/lib/config";
 import { bot, short, TODAY } from "@/lib/format";
 import { REPORT_STATUS, pillClass } from "@/lib/status";
 import s from "./report.module.css";
@@ -155,7 +155,7 @@ export default function ReportView({ reportId }: { reportId: string }) {
                   <li key={a.name}>
                     <span>{a.name}</span>
                     <span className="dash num">{a.size}</span>
-                    <button className="btn btn-text" disabled={PREVIEW_DATA} title={PREVIEW_DATA ? "Preview build: no files are stored" : undefined}>
+                    <button className="btn btn-text" disabled={!REPORTS_LIVE} title={!REPORTS_LIVE ? "Sample report: no files are stored" : undefined}>
                       Download
                     </button>
                   </li>
@@ -502,7 +502,7 @@ function Release({
           <li data-state="next">Paid</li>
         </ol>
       )}
-      {PREVIEW_DATA && (tx.phase === "wallet" || tx.phase === "pending") && <p className={s.previewNote}>Preview build: no transaction is sent.</p>}
+      {!REPORTS_LIVE && (tx.phase === "wallet" || tx.phase === "pending") && <p className={s.previewNote}>Sample report: no transaction is sent.</p>}
 
       <dialog ref={dialog} className={s.dialog} onClose={() => tx.phase === "confirm" && setTx({ phase: "idle" })} aria-labelledby="dlg-h">
         <h2 id="dlg-h">Release {bot(amount)} BOT to the researcher?</h2>

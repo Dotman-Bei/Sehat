@@ -62,9 +62,13 @@ export type OnChainState = {
   closesAt: number | null; // unix seconds
   closingWindowSeconds: number;
   readAtBlock: number;
+  /** Timestamp of that block. Time-based rules (the closing window) are judged by chain time, not the browser clock. */
+  readAtTime: number;
   metadataHash: string;
   metadataURI: string;
   metadataStatus: "verified" | "mismatch" | "unavailable";
+  /** False while the RPC's event index lags contract state (event sums differ from the contract's totals). */
+  historyComplete: boolean;
 };
 
 export type Message = {

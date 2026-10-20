@@ -22,6 +22,7 @@ export type Row = {
   updated: string;
   updatedAge: string;
   accepting: boolean;
+  test: boolean;
 };
 
 const TABS: { id: ProgrammeStatus | "all"; label: string }[] = [
@@ -40,7 +41,8 @@ const SORTS = {
 
 export default function ProgrammeTable({ rows }: { rows: Row[] }) {
   const router = useRouter();
-  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("active");
+  // Open on Active, or on All when nothing is active, so the first screen is never an empty list.
+  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>(() => (rows.some((r) => r.status === "active") ? "active" : "all"));
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<keyof typeof SORTS>("escrow");
 
@@ -115,7 +117,10 @@ export default function ProgrammeTable({ rows }: { rows: Row[] }) {
                     <Link href={`/programs/${r.id}`} className="cell-main" onClick={(e) => e.stopPropagation()}>
                       {r.project}
                     </Link>
-                    <div className="cell-sub">{r.title}</div>
+                    <div className="cell-sub">
+                      {r.title}
+                      {r.test && <span className="pill pill-notice" style={{ marginLeft: 8, height: 18 }}>Test</span>}
+                    </div>
                     <div className={`cell-sub ${s.scopeSub}`}>
                       {r.scope.slice(0, 2).join(", ")}
                       {r.scope.length > 2 && ` +${r.scope.length - 2}`}

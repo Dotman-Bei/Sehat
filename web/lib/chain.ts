@@ -73,8 +73,9 @@ export type ChainEvent = {
 const CHUNK = BigInt(50_000);
 
 /** Every escrow event (optionally for one programme), oldest first, with block timestamps. */
-export async function readEvents(programmeId?: number): Promise<{ events: ChainEvent[]; latestBlock: number }> {
-  const latest = await publicClient.getBlockNumber();
+export async function readEvents(programmeId?: number): Promise<{ events: ChainEvent[]; latestBlock: number; latestTime: number }> {
+  const head = await publicClient.getBlock();
+  const latest = head.number;
   const id = programmeId === undefined ? undefined : BigInt(programmeId);
   const raw: ChainEvent[] = [];
 
@@ -108,7 +109,7 @@ export async function readEvents(programmeId?: number): Promise<{ events: ChainE
   );
   for (const e of raw) e.timestamp = stamps.get(e.block) ?? 0;
   raw.sort((a, b) => a.block - b.block);
-  return { events: raw, latestBlock: Number(latest) };
+  return { events: raw, latestBlock: Number(latest), latestTime: Number(head.timestamp) };
 }
 
 export const isoDate = (unix: number) => new Date(unix * 1000).toISOString().slice(0, 10);

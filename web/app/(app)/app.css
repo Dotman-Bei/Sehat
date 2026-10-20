@@ -241,6 +241,7 @@
   .canvas { padding: 24px var(--pad) 48px; }
   .title-row h1 { font-size: 22px; line-height: 28px; }
   .search { width: 100%; }
+  .tabs { flex-wrap: wrap; gap: 0 18px; overflow: visible; }
 }
 
 /* ---------- hashes and addresses ---------- */

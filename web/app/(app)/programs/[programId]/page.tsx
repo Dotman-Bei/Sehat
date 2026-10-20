@@ -2,37 +2,28 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Hash from "@/components/app/Hash";
-import {
-  ESCROW_CONTRACT,
-  LATEST_BLOCK,
-  PROGRAMMES,
-  acceptsRewards,
-  balance,
-  funded,
-  getProgramme,
-  paidOut,
-  reportsFor,
-  withdrawn,
-} from "@/lib/sample-data";
-import { addressUrl, txUrl } from "@/lib/config";
+import { ESCROW_CONTRACT, LATEST_BLOCK, acceptsRewards, balance, funded, paidOut, reportsFor, withdrawn } from "@/lib/sample-data";
+import { findProgramme } from "@/lib/programmes";
+import { CHAIN_LIVE, ESCROW_ADDRESS, REPORTS_LIVE, addressUrl, txUrl } from "@/lib/config";
 import { bot, signed } from "@/lib/format";
 import { blockedReason, pillClass, programmeState } from "@/lib/status";
 import s from "./detail.module.css";
 
 type Params = { programId: string };
 
-export function generateStaticParams() {
-  return PROGRAMMES.map((p) => ({ programId: p.id }));
-}
+// Balances and history come from the escrow contract on every request.
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
-  const p = getProgramme((await params).programId);
+  const p = await findProgramme((await params).programId);
   return { title: p ? `${p.project} ${p.title} · Sehat` : "Programme · Sehat" };
 }
 
 export default async function ProgrammeDetail({ params }: { params: Promise<Params> }) {
-  const p = getProgramme((await params).programId);
+  const p = await findProgramme((await params).programId);
   if (!p) notFound();
+  const contract = CHAIN_LIVE ? ESCROW_ADDRESS : ESCROW_CONTRACT;
+  const meta = p.onChain?.metadataStatus;
 
   const total = funded(p);
   const paid = paidOut(p);
@@ -55,6 +46,11 @@ export default async function ProgrammeDetail({ params }: { params: Promise<Para
             <span className={pillClass(state.tone)} style={{ marginRight: 8 }}>
               {state.label}
             </span>
+            {p.test && (
+              <span className="pill pill-notice" style={{ marginRight: 8 }}>
+                Test programme
+              </span>
+            )}
             Since {p.startDate}
             {p.endDate ? `, ends ${p.endDate}` : ""}. {p.summary}
           </p>
@@ -83,7 +79,7 @@ export default async function ProgrammeDetail({ params }: { params: Promise<Para
             <div className="panel-head">
               <h2 id="escrow-h">Escrow</h2>
               <span className="panel-meta">
-                Read from the escrow contract at block {bot(LATEST_BLOCK)}
+                Read from the escrow contract at block {bot(p.onChain?.readAtBlock ?? LATEST_BLOCK)}
               </span>
             </div>
             <p className="answer">
@@ -218,7 +214,9 @@ export default async function ProgrammeDetail({ params }: { params: Promise<Para
           <section className="panel" aria-labelledby="history-h">
             <div className="panel-head">
               <h2 id="history-h">Funding and payouts</h2>
-              <span className="panel-meta">{p.events.length} events</span>
+              <span className="panel-meta">
+                {p.onChain && !p.onChain.historyComplete ? "History is catching up with the contract" : `${p.events.length} events`}
+              </span>
             </div>
             <ol className="events">
               {[...p.events].reverse().map((e) => (
@@ -252,7 +250,7 @@ export default async function ProgrammeDetail({ params }: { params: Promise<Para
               <dt>Closing window</dt>
               <dd>{p.closingWindowDays} days</dd>
               <dt>Reports received</dt>
-              <dd>{reports.length}</dd>
+              <dd>{CHAIN_LIVE && !REPORTS_LIVE ? <span className="dash">Reports service not connected</span> : reports.length}</dd>
               <dt>Rewards paid</dt>
               <dd>{paidCount}</dd>
               <dt>Owner</dt>
@@ -261,10 +259,22 @@ export default async function ProgrammeDetail({ params }: { params: Promise<Para
               </dd>
               <dt>Escrow contract</dt>
               <dd>
-                <Hash value={ESCROW_CONTRACT} href={addressUrl(ESCROW_CONTRACT)} />
+                <Hash value={contract} href={addressUrl(contract)} />
               </dd>
               <dt>Programme ID</dt>
-              <dd>{p.id}</dd>
+              <dd>{p.onChain ? p.onChain.programmeId : p.id}</dd>
+              {p.onChain && (
+                <>
+                  <dt>Public metadata</dt>
+                  <dd>
+                    {meta === "verified" ? "Matches on-chain hash" : meta === "mismatch" ? "Does not match on-chain hash" : "Could not be loaded"}
+                  </dd>
+                  <dt>Metadata hash</dt>
+                  <dd>
+                    <Hash value={p.onChain.metadataHash} />
+                  </dd>
+                </>
+              )}
             </dl>
           </section>
         </aside>

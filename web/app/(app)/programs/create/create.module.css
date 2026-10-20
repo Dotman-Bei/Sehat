@@ -79,3 +79,4 @@
   .steps ol { flex-wrap: wrap; gap: 0 18px; }
   .stepBtn { height: 34px; }
 }
+.metaBox { display: grid; gap: 12px; padding-bottom: 16px; margin-bottom: 4px; border-bottom: 1px solid var(--rule); }

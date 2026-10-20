@@ -62,7 +62,7 @@ const STATUS: Record<RawProgramme["status"], ProgrammeStatus> = {
   closed: "closed",
 };
 
-async function toProgramme(raw: RawProgramme, events: ChainEvent[], latestBlock: number): Promise<Programme> {
+async function toProgramme(raw: RawProgramme, events: ChainEvent[], latestBlock: number, latestTime: number): Promise<Programme> {
   const own = events.filter((e) => e.programmeId === raw.id);
   const reg = own.find((e) => e.kind === "registered");
   // The latest pointer wins: registration, then any MetadataUpdated after it.
@@ -73,6 +73,10 @@ async function toProgramme(raw: RawProgramme, events: ChainEvent[], latestBlock:
     const t = ok ? meta.tiers?.find((x) => x.severity === severity) : undefined;
     return { severity, min: Number(t?.min ?? 0), max: Number(t?.max ?? 0), example: t?.example ?? "" };
   });
+
+  const sumOf = (k: ChainEvent["kind"]) => own.filter((e) => e.kind === k).reduce((t, e) => t + e.amount, 0);
+  const same = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+  const historyComplete = same(sumOf("funded"), toBot(raw.totalFunded)) && same(sumOf("paid"), toBot(raw.totalPaid));
 
   return {
     id: String(raw.id),
@@ -110,17 +114,19 @@ async function toProgramme(raw: RawProgramme, events: ChainEvent[], latestBlock:
       closesAt: raw.closesAt || null,
       closingWindowSeconds: raw.closingWindow,
       readAtBlock: latestBlock,
+      readAtTime: latestTime,
       metadataHash: raw.metadataHash,
       metadataURI: current?.metadataURI ?? "",
       metadataStatus: status,
+      historyComplete,
     },
   };
 }
 
 export async function listProgrammes(): Promise<Programme[]> {
   if (!CHAIN_LIVE) return PROGRAMMES;
-  const [raws, { events, latestBlock }] = await Promise.all([readAllProgrammes(), readEvents()]);
-  return Promise.all(raws.map((r) => toProgramme(r, events, latestBlock)));
+  const [raws, { events, latestBlock, latestTime }] = await Promise.all([readAllProgrammes(), readEvents()]);
+  return Promise.all(raws.map((r) => toProgramme(r, events, latestBlock, latestTime)));
 }
 
 export async function findProgramme(id: string): Promise<Programme | undefined> {
@@ -128,6 +134,6 @@ export async function findProgramme(id: string): Promise<Programme | undefined> 
   if (!/^\d+$/.test(id)) return undefined;
   const raw = await readProgramme(Number(id));
   if (!raw) return undefined;
-  const { events, latestBlock } = await readEvents(raw.id);
-  return toProgramme(raw, events, latestBlock);
+  const { events, latestBlock, latestTime } = await readEvents(raw.id);
+  return toProgramme(raw, events, latestBlock, latestTime);
 }
