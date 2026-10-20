@@ -1,0 +1,81 @@
+/* 1320 canvas: 200px step list + 16 + 1104 body. Body row: 320 label + 24 + 760 panel. */
+.layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: var(--gap); align-items: start; }
+
+.steps { position: sticky; top: 24px; }
+.steps ol { display: grid; }
+.stepBtn {
+  display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px;
+  height: 36px; padding: 0 8px 0 0; border: 0; background: none; color: var(--muted); text-align: left;
+  transition: color var(--t-hover) ease;
+}
+.stepBtn:disabled { color: var(--faint); cursor: not-allowed; }
+.stepBtn[aria-current="step"] { color: var(--text); font-weight: 500; }
+.stepName { position: relative; padding: 4px 0; }
+.stepBtn[aria-current="step"] .stepName::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--accent-text); }
+.stepState { font-size: 12px; color: var(--faint); font-weight: 400; }
+@media (hover: hover) and (pointer: fine) { .stepBtn:not(:disabled):hover { color: var(--text); } }
+
+.body { display: grid; gap: 32px; min-width: 0; }
+.row { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 24px; align-items: start; }
+.rowLabel h2 { font-size: 16px; font-weight: 600; line-height: 22px; margin-top: 20px; }
+.rowLabel p { color: var(--muted); margin-top: 4px; max-width: 36ch; }
+.rowPanel { display: grid; gap: 16px; padding: 20px; }
+
+.field { display: grid; gap: 8px; }
+.field label { font-weight: 500; }
+.field :global(.input), .field :global(.select) { height: 40px; width: 100%; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.hint { color: var(--muted); font-size: 13px; }
+.err { color: var(--negative); font-size: 12px; margin-top: 4px; text-align: right; }
+.warn { color: var(--notice); font-size: 13px; }
+.previewNote { color: var(--notice); font-size: 12px; }
+
+.targets { display: grid; gap: 8px; }
+.targetRow { display: grid; grid-template-columns: minmax(0, 1.2fr) 170px minmax(0, 1.4fr) auto; gap: 8px; }
+.targetRowShort { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; gap: 8px; }
+
+.tierTable td { vertical-align: middle; padding-top: 8px; padding-bottom: 8px; }
+.tierTable :global(.input) { width: 140px; text-align: right; }
+
+.preview { padding: 16px; background: var(--raised); border-radius: var(--radius-control); }
+.previewTitle { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+.checklist { display: grid; }
+.checklist li { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-top: 1px solid var(--rule); color: var(--notice); }
+.checklist li span:first-child { color: var(--text); }
+.checklist li[data-ok] { color: var(--muted); }
+
+.txSteps { display: grid; gap: 8px; }
+.txSteps li { position: relative; padding-left: 20px; color: var(--faint); }
+.txSteps li:not(.previewNote)::before { content: ""; position: absolute; left: 2px; top: 6px; width: 8px; height: 8px; border-radius: 50%; border: 1px solid currentColor; }
+.txSteps li[data-state="done"] { color: var(--muted); }
+.txSteps li[data-state="done"]::before { background: var(--muted); }
+.txSteps li[data-state="now"] { color: var(--text); }
+.txSteps li[data-state="now"]::before { border-color: var(--accent-text); background: var(--accent-text); }
+.doneBox { display: grid; gap: 8px; }
+
+.nav { display: flex; align-items: center; gap: 16px; justify-content: space-between; padding-left: 344px; }
+.problem { color: var(--muted); font-size: 13px; margin-left: auto; }
+
+@media (max-width: 1100px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .steps { position: static; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--border); }
+  .steps ol { display: flex; gap: 20px; }
+  .stepBtn { height: 40px; white-space: nowrap; padding: 0; }
+  .stepState { display: none; }
+  .row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .rowLabel h2 { margin-top: 0; }
+  .nav { padding-left: 0; }
+}
+@media (max-width: 760px) {
+  .targetRow, .targetRowShort { grid-template-columns: minmax(0, 1fr); padding-bottom: 12px; border-bottom: 1px solid var(--rule); }
+  .pair { grid-template-columns: 1fr; }
+  .tierTable :global(.input) { width: 100px; }
+  .nav { flex-wrap: wrap; }
+  .nav :global(.btn-primary) { flex: 1; height: 44px; }
+  .problem { order: -1; width: 100%; margin: 0; }
+}
+@media (max-width: 760px) {
+  .steps { overflow: visible; padding-bottom: 8px; }
+  .steps ol { flex-wrap: wrap; gap: 0 18px; }
+  .stepBtn { height: 34px; }
+}
