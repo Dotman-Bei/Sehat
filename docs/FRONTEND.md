@@ -350,13 +350,16 @@ Question: *Which of my reports need me, and what have I been paid?*
 
 - h1 **Your reports**. Subline (the finding): *1 report needs information from you. 30,000 BOT
   agreed and awaiting release.*
-- Strip (one divided container): Submitted 7 · In triage 2 · Accepted 2 · Paid 450 BOT · Closed
-  without reward 2. Computed from rows.
-- Needs you first: the needs-information row with its question and **Reply**.
+- Lead row, two blocks of one height: **Waiting on your reply** (the team's question quoted, with
+  **Reply to …**) and **Rewards** (30,000 BOT awaiting release as the answer figure, each agreed
+  or paid reward, "Paid to you so far 450 BOT"). No separate KPI strip: the status counts live in
+  the tabs (All 7 · Open 3 · Accepted 2 · Closed without reward 2), computed from the rows.
 - Table: Reference · Title · Programme · Suggested / confirmed severity · Status · Reward (BOT) ·
   Updated. Filters: status tabs, programme select, date sort.
 - Paid rows show the tx link. Closed rows show the reason ("Duplicate of an earlier report").
 - Disconnected: frame kept, *Connect a wallet to see the reports you submitted from it.*
+- Preview builds accept `?as=researcher`, `?as=owner` or `?as=admin` to select a labelled preview
+  identity, so every role's screen can be reviewed without a deployed contract.
 
 ### 4.6 Report detail — `/reports/[reportId]` (detail and thread)
 

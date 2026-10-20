@@ -141,7 +141,7 @@ function WalletButton() {
         {w.address ? (
           <>
             <span className="num">{short(w.address)}</span>
-            {preview && <span className="pill pill-notice" style={{ height: 20 }}>Preview · {preview.label}</span>}
+            {preview && <span className="pill pill-notice" style={{ height: 20 }}>Preview<span className="wide-only"> · {preview.label}</span></span>}
           </>
         ) : (
           "Connect wallet"

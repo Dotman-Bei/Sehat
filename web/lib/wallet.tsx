@@ -55,6 +55,15 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   // Restore a preview identity for this tab only.
   useEffect(() => {
     setHasBrowserWallet(typeof window !== "undefined" && !!window.ethereum);
+    // Preview links: ?as=researcher | owner | admin selects a labelled preview identity.
+    const as = new URLSearchParams(window.location.search).get("as");
+    const byParam = as && PREVIEW_IDENTITIES.find((p) => p.label.toLowerCase().includes(as.toLowerCase()));
+    if (byParam) {
+      setAddress(byParam.address);
+      setKind("preview");
+      setChainId(ACTIVE_NETWORK.chainId);
+      return;
+    }
     try {
       const saved = sessionStorage.getItem(KEY);
       if (saved && PREVIEW_IDENTITIES.some((p) => p.address === saved)) {
