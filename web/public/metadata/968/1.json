@@ -1,0 +1,28 @@
+{
+  "schema": "sehat.programme/1",
+  "test": true,
+  "project": "Sehat test",
+  "title": "Escrow smoke test (not a real bounty)",
+  "summary": "A test programme used to check funding, payout and duplicate-payment refusal on Bohr testnet. It pays nothing for findings.",
+  "scope": [
+    { "target": "SehatEscrow (Bohr testnet)", "kind": "Smart contract", "note": "Test only; report real issues privately to the Sehat team" }
+  ],
+  "outOfScope": [
+    { "target": "Everything else", "note": "This programme does not accept reports" }
+  ],
+  "tiers": [
+    { "severity": "Critical", "min": "0.05", "max": "0.08", "example": "Test value only" },
+    { "severity": "High", "min": "0.02", "max": "0.05", "example": "Test value only" },
+    { "severity": "Medium", "min": "0.01", "max": "0.02", "example": "Test value only" },
+    { "severity": "Low", "min": "0.005", "max": "0.01", "example": "Test value only" },
+    { "severity": "Informational", "min": "0", "max": "0.005", "example": "Test value only" }
+  ],
+  "rules": [
+    "This is a test programme. Do not submit reports to it.",
+    "Report real problems with Sehat privately to the Sehat team."
+  ],
+  "automatedScanning": "Not applicable.",
+  "disclosure": "Not applicable.",
+  "duplicates": "Not applicable.",
+  "triagers": []
+}

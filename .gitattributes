@@ -1,0 +1,2 @@
+# Metadata bytes are hashed on-chain: never convert line endings.
+web/public/metadata/** -text
