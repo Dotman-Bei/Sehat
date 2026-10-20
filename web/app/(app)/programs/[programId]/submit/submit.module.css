@@ -1,0 +1,55 @@
+.form { display: grid; gap: 24px; padding: 24px; }
+.field { display: grid; gap: 8px; min-width: 0; border: 0; margin: 0; padding: 0; }
+.field label, .field legend, .labelLike { font-weight: 500; font-size: 14px; padding: 0; }
+.field :global(.input), .field :global(.select) { height: 40px; width: 100%; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.optional { color: var(--muted); font-weight: 400; margin-left: 6px; }
+.help { color: var(--muted); font-size: 13px; }
+.err { color: var(--negative); font-size: 13px; }
+.warn { color: var(--notice); font-size: 13px; }
+
+.sevList { display: grid; border: 1px solid var(--control); border-radius: var(--radius-control); overflow: hidden; }
+.sevRow {
+  display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: 12px;
+  min-height: 44px; padding: 0 14px; cursor: pointer; transition: background-color var(--t-hover) ease;
+}
+.sevRow + .sevRow { border-top: 1px solid var(--border); }
+.sevRow input { margin: 0; accent-color: var(--accent); width: 16px; height: 16px; }
+.sevRow[data-checked] { background: var(--raised); }
+.sevRow[data-checked] .sevName { box-shadow: inset 0 -1px 0 var(--accent-text); } /* taste-skill-ignore: the style's 1px selection line under the label */
+.sevName { font-weight: 500; justify-self: start; padding-bottom: 2px; }
+.sevRange { color: var(--muted); }
+@media (hover: hover) and (pointer: fine) { .sevRow:hover { background: var(--raised); } }
+
+.fileBtn { position: relative; justify-self: start; cursor: pointer; }
+.fileBtn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.fileBtn:focus-within { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+.files { display: grid; }
+.files li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 6px 0; border-top: 1px solid var(--rule); }
+.files li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.confirm { display: grid; grid-template-columns: 20px 1fr; gap: 10px; align-items: start; font-size: 14px; cursor: pointer; }
+.confirm input { margin: 2px 0 0; width: 16px; height: 16px; accent-color: var(--accent); }
+
+.submitRow { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding-top: 8px; }
+.still { color: var(--muted); font-size: 13px; flex: 1; min-width: 200px; }
+
+.readers li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--rule); }
+.readers li:first-child { border-top: 0; padding-top: 0; }
+.chainText { font-family: var(--font-text); font-size: 16px; line-height: 1.55; }
+.rulesLink { display: inline-block; margin-top: 14px; text-decoration: underline; text-decoration-color: #4a4a4a; text-underline-offset: 3px; }
+
+.done { max-width: 720px; display: grid; gap: 16px; }
+.doneText { font-family: var(--font-text); font-size: 16px; line-height: 1.55; max-width: 60ch; }
+.previewNote { color: var(--notice); font-size: 13px; }
+.doneActions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+@media (max-width: 760px) {
+  .form { padding: 16px; }
+  .pair { grid-template-columns: 1fr; }
+  .submitRow :global(.btn) { width: 100%; height: 44px; }
+}
+
+/* label rows and the file button keep their own padding inside a field */
+.field .sevRow { padding: 0 14px; font-weight: 400; }
+.field .fileBtn { padding: 0 14px; font-weight: 500; }

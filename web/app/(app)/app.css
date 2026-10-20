@@ -150,6 +150,7 @@
 }
 .textarea { height: auto; min-height: 120px; padding: 10px 12px; line-height: 1.5; resize: vertical; font-family: var(--font-text); font-size: 16px; }
 .input::placeholder, .textarea::placeholder { color: var(--faint); }
+.input[aria-invalid="true"], .select[aria-invalid="true"], .textarea[aria-invalid="true"] { border-color: var(--negative); }
 .input:focus-visible, .select:focus-visible, .textarea:focus-visible { outline: 1px solid var(--accent-text); outline-offset: 0; border-color: var(--accent-text); }
 .search { width: 300px; padding-left: 34px; background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%238c8c8c' stroke-width='1.5'%3E%3Ccircle cx='6' cy='6' r='4.5'/%3E%3Cpath d='m9.5 9.5 3 3'/%3E%3C/svg%3E") no-repeat 12px center; }
 .count-label { color: var(--muted); font-variant-numeric: tabular-nums; }
