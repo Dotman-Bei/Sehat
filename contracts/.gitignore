@@ -3,3 +3,5 @@ cache/
 broadcast/*/31337/
 .env
 broadcast/**/dry-run/
+.env.*
+!.env.example
