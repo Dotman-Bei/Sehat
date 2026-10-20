@@ -437,3 +437,26 @@ Generic patterns the skill bans, and the Sehat-specific temptations behind them:
 - KPI tiles with icons in tinted circles, sparklines, a rainbow of severity colours, a dark navy
   sidebar, a "Welcome back" greeting.
 - Stock copy: unlock, empower, seamless, robust, cutting-edge, next-generation.
+
+---
+
+## 6. Build notes (decisions taken while building)
+
+- **Hero strips.** The frames directly above the text panel and at the foot of the centre column
+  carry no colour strip. A short label directly above a heading reads as an eyebrow.
+- **Home bar on phones.** The scrolled site bar keeps the wordmark and **Browse programmes** only;
+  the three text links live in the hero panel and the footer.
+- **Stats.** The bars are the platform's escrow at the end of each of the last 14 weeks, computed
+  from the escrow events, with the current week in crimson. On phones they become the last 8 weeks
+  as horizontal rows.
+- **Privacy on public pages.** Programme detail shows only on-chain facts (funded, paid, returned,
+  available). Agreed-but-unpaid rewards appear only to the owner, since they would reveal an
+  unfixed finding.
+- **App type.** Libre Franklin for the interface, Source Serif 4 for report bodies, rules and
+  messages. Hashes and addresses are tabular Libre Franklin; no monospace anywhere.
+- **Metrics on admin** are split by source, *From the escrow contract* and *From the reports
+  database*, because the two count different things (payouts include reports not in the database
+  sample).
+- **Preview identities.** While `NEXT_PUBLIC_SEHAT_ESCROW` is unset the app shows sample data,
+  a notice line on every app screen, and preview identities in the wallet menu (or `?as=…`).
+  Setting the escrow address turns all of this off.

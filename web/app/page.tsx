@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import h from "./home.module.css";
 import Showcase from "@/components/home/Showcase";
@@ -151,7 +152,7 @@ export default function Home() {
                 <EscrowTile p={quayside} />
               </Frame>
               <Frame label="Bolt work of a vault door" strip={1} className={h.photoTall}>
-                <img className="photo" src="/images/vault-workings.jpg" alt="The inside of a bank vault door: bolts, bars and a three-dial time lock" width={1152} height={2048} />
+                <Image className="photo" src="/images/vault-workings.jpg" alt="The inside of a bank vault door: bolts, bars and a three-dial time lock" fill sizes="(max-width: 640px) 50vw, 16vw" />
               </Frame>
               <Frame label="Larkspur · in scope" strip={2}>
                 <ScopeList p={larkspur} />
@@ -166,14 +167,14 @@ export default function Home() {
                 <TierTable p={brindle} />
               </Frame>
               <Frame label="Numbered deposit boxes, Zürich" strip={1} className={h.photoSquare}>
-                <img className="photo" src="/images/deposit-boxes.jpg" alt="A wall of numbered safe deposit boxes with brass plates" width={1920} height={1952} loading="lazy" />
+                <Image className="photo" src="/images/deposit-boxes.jpg" alt="A wall of numbered safe deposit boxes with brass plates" fill sizes="(max-width: 640px) 50vw, 16vw" />
               </Frame>
             </div>
 
             <div className={`${h.col} ${h.c34}`}>
               <Frame className={h.photoTop}>
                 <div className={`shutter ${h.shutter}`}>
-                  <img className="photo" src="/images/time-lock.jpg" alt="Three clock dials of a Yale bank-vault time lock" width={1920} height={1448} fetchPriority="high" />
+                  <Image className="photo" src="/images/time-lock.jpg" alt="Three clock dials of a Yale bank-vault time lock" fill sizes="(max-width: 1100px) 50vw, 33vw" priority />
                 </div>
               </Frame>
 
@@ -427,7 +428,7 @@ export default function Home() {
         {/* ---- the action tile ---- */}
         <section className={h.cta} aria-labelledby="cta-title">
           <div className={`${h.ctaFlank} ${h.ctaLeft}`}>
-            <img className="photo" src="/images/vault-workings.jpg" alt="" width={1152} height={2048} loading="lazy" />
+            <Image className="photo" src="/images/vault-workings.jpg" alt="" fill sizes="(max-width: 640px) 50vw, 17vw" />
           </div>
           <div className={h.ctaMain}>
             <h2 id="cta-title" className={h.ctaTitle} data-reveal>
