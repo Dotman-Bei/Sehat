@@ -297,8 +297,8 @@ the programme.* Last row: © 2026 Sehat, picture credits, small button **Browse 
 
 Question: *Which funded programme is worth my time?*
 
-- h1 **Programmes**. Subline: *6 of 8 programmes accept reward-bearing reports. Balances read from
-  escrow.* (computed)
+- h1 **Programmes**. Subline: *4 of 8 accept reward-bearing reports, with 183,100 BOT in escrow.
+  Kestrel opened 3 days ago.* (computed from the rows)
 - Tabs: Active (5) · Paused (1) · Closing (1) · Closed (1) · All (8). (Saltmarsh counts as Active
   with escrow empty.)
 - Toolbar: search "Search by project or target", sort "Most in escrow" / "Newest" / "Highest

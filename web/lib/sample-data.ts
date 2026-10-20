@@ -104,6 +104,8 @@ const ev = (kind: EscrowEvent["kind"], amount: number, date: string, block: numb
 });
 
 export const RESEARCHER = addr("researcher-main");
+export const ADMIN_WALLET = addr("platform-admin");
+export const QUAYSIDE_OWNER = addr("quayside-owner");
 export const ESCROW_CONTRACT = addr("sehat-escrow");
 export const LATEST_BLOCK = 1_284_601;
 
