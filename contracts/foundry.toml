@@ -1,0 +1,27 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc_version = "0.8.28"
+# Bohr testnet runs PUSH0, TSTORE and MCOPY (probed 2026-10-20 against rpc.bohr.life). Recheck before mainnet.
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 10000
+
+[fuzz]
+runs = 1000
+
+[invariant]
+runs = 256
+depth = 64
+fail_on_revert = false
+
+# Network values from https://dev-docs.botchain.ai/docs/Developers/quick-guide/ (checked 2026-10-20).
+[rpc_endpoints]
+bohr = "https://rpc.bohr.life"
+botchain = "https://rpc.botchain.ai"
+
+# Both explorers run Blockscout (Etherscan-compatible /api). No API key is needed.
+[etherscan]
+bohr = { key = "blockscout", chain = 968, url = "https://scan.bohr.life/api" }
+botchain = { key = "blockscout", chain = 677, url = "https://scan.botchain.ai/api" }
