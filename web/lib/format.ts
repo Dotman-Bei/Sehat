@@ -1,6 +1,6 @@
-const nf = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 0 });
+const nf = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 4 });
 
-/** Whole BOT with thousands separators: 75,000 */
+/** BOT with thousands separators and up to 4 decimals: 75,000 · 0.08 */
 export const bot = (n: number) => nf.format(n);
 
 /** Signed change: +40,000 / −7,000 */

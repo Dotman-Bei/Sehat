@@ -16,3 +16,12 @@ keccak256 `0x8549f555…a26c`, recorded on-chain at registration.
 
 The report reference is `keccak256(abi.encode("SMOKE-0001", keccak256("sehat-smoke-salt-2026-10-20")))`.
 The remaining 0.08 BOT can be recovered with `startClosing(1)` followed, 7 days later, by `withdrawUnused(1, owner)`.
+
+## Correction: metadata URI
+
+Git Bash on Windows rewrote the `/metadata/968/1.json` argument into a Windows path when programme 1
+was registered, so the registration event carries `C:/Program Files/Git/metadata/968/1.json`. The
+hash was unaffected. Fixed with `updateMetadata(1, 0x8549f555…a26c, "/metadata/968/1.json")`, tx
+`0xabd64f943299146b6805d768b6d2124e757c4b75505e8e1ceb52a6a770e0fa07`, block 27,531,109. The app
+reads the latest `MetadataUpdated` pointer. Run `cast` with `MSYS_NO_PATHCONV=1` when an argument
+starts with `/`.

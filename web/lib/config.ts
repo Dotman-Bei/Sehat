@@ -1,6 +1,8 @@
 // Network details from the BOT Chain quick guide. Recheck against
 // https://dev-docs.botchain.ai/docs/Developers/quick-guide/ before any deployment.
 
+import { defineChain } from "viem";
+
 export type Network = {
   key: "mainnet" | "testnet";
   name: string;
@@ -26,14 +28,31 @@ export const NETWORKS: Record<Network["key"], Network> = {
   },
 };
 
-export const ACTIVE_NETWORK: Network =
-  NETWORKS[(process.env.NEXT_PUBLIC_SEHAT_NETWORK as Network["key"]) ?? "testnet"] ?? NETWORKS.testnet;
+const base = NETWORKS[(process.env.NEXT_PUBLIC_SEHAT_NETWORK as Network["key"]) ?? "testnet"] ?? NETWORKS.testnet;
 
-/** Escrow contract address; unset until the contract is deployed. */
-export const ESCROW_ADDRESS = process.env.NEXT_PUBLIC_SEHAT_ESCROW ?? "";
+/** The active network. NEXT_PUBLIC_SEHAT_RPC overrides the RPC (for a local fork in tests). */
+export const ACTIVE_NETWORK: Network = { ...base, rpc: process.env.NEXT_PUBLIC_SEHAT_RPC || base.rpc };
 
-/** True while the app renders sample data instead of contract state and the API. */
-export const PREVIEW_DATA = !ESCROW_ADDRESS;
+export const VIEM_CHAIN = defineChain({
+  id: ACTIVE_NETWORK.chainId,
+  name: ACTIVE_NETWORK.name,
+  nativeCurrency: { name: "BOT", symbol: "BOT", decimals: 18 },
+  rpcUrls: { default: { http: [ACTIVE_NETWORK.rpc] } },
+  blockExplorers: { default: { name: "Blockscout", url: ACTIVE_NETWORK.explorer } },
+});
+
+/** Escrow contract address; unset until the app should read from the contract. */
+export const ESCROW_ADDRESS = (process.env.NEXT_PUBLIC_SEHAT_ESCROW ?? "") as `0x${string}` | "";
+/** Block the escrow contract was deployed in; event scans start here. */
+export const ESCROW_DEPLOY_BLOCK = BigInt(process.env.NEXT_PUBLIC_SEHAT_ESCROW_BLOCK || "0");
+
+/** Programmes, balances and escrow events come from the contract. */
+export const CHAIN_LIVE = /^0x[0-9a-fA-F]{40}$/.test(ESCROW_ADDRESS);
+/** Reports, threads and triage come from the private reports API. Not built yet. */
+export const REPORTS_LIVE = false;
+
+/** Sample programmes and balances are shown (no escrow configured). */
+export const PREVIEW_DATA = !CHAIN_LIVE;
 
 export const txUrl = (hash: string) => `${ACTIVE_NETWORK.explorer}/tx/${hash}`;
 export const addressUrl = (address: string) => `${ACTIVE_NETWORK.explorer}/address/${address}`;

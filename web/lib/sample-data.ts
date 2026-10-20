@@ -48,6 +48,23 @@ export type Programme = {
   duplicates: string;
   events: EscrowEvent[];
   triagers: { name: string; wallet: string }[];
+  /** Present when the programme was read from the escrow contract. Figures here are authoritative. */
+  onChain?: OnChainState;
+  /** Labelled test programme (from its metadata). */
+  test?: boolean;
+};
+
+export type OnChainState = {
+  programmeId: number;
+  balance: number;
+  totalFunded: number;
+  totalPaid: number;
+  closesAt: number | null; // unix seconds
+  closingWindowSeconds: number;
+  readAtBlock: number;
+  metadataHash: string;
+  metadataURI: string;
+  metadataStatus: "verified" | "mismatch" | "unavailable";
 };
 
 export type Message = {
@@ -390,10 +407,13 @@ export const PROGRAMMES: Programme[] = [
 const sum = (events: EscrowEvent[], kind: EscrowEvent["kind"]) =>
   events.filter((e) => e.kind === kind).reduce((t, e) => t + e.amount, 0);
 
-export const funded = (p: Programme) => sum(p.events, "funded");
-export const paidOut = (p: Programme) => sum(p.events, "paid");
-export const withdrawn = (p: Programme) => sum(p.events, "withdrawn");
-export const balance = (p: Programme) => funded(p) - paidOut(p) - withdrawn(p);
+// Contract state wins when present: the UI shows balances read from the contract, never sums of its own.
+export const funded = (p: Programme) => p.onChain?.totalFunded ?? sum(p.events, "funded");
+export const paidOut = (p: Programme) => p.onChain?.totalPaid ?? sum(p.events, "paid");
+export const withdrawn = (p: Programme) =>
+  p.onChain ? Math.max(0, round4(p.onChain.totalFunded - p.onChain.totalPaid - p.onChain.balance)) : sum(p.events, "withdrawn");
+export const balance = (p: Programme) => p.onChain?.balance ?? funded(p) - paidOut(p) - withdrawn(p);
+const round4 = (n: number) => Math.round(n * 1e4) / 1e4;
 
 /** Rewards agreed but not yet released. The contract does not reserve these; the UI shows them. */
 export const agreedUnpaid = (p: Programme) =>
