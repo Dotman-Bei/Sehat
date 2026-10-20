@@ -471,3 +471,8 @@ Generic patterns the skill bans, and the Sehat-specific temptations behind them:
 - **Builder, live.** Register shows the metadata hash, a download of the exact metadata file and a
   field for its hosted address. Publish is a link to the programme page: a registered, funded
   programme is listed straight from the contract.
+- **Full live mode** (`NEXT_PUBLIC_SEHAT_REPORTS=live`). Report screens read the private reports
+  service. Private pages ask the visitor to connect, then "Sign in with this wallet" (a signed message,
+  no gas). A wallet with no access sees one sentence, never a hint of the report. The programme page
+  gains "Report a problem with …" for moderation. Release on a report sends `releaseReward` from the
+  owner's wallet and shows Paid only after the server has checked the receipt.

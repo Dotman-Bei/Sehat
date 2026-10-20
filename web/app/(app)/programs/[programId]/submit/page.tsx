@@ -5,6 +5,8 @@ import ReportForm from "./ReportForm";
 import { findProgramme } from "@/lib/programmes";
 import { blockedReason } from "@/lib/status";
 import { short } from "@/lib/format";
+import { REPORTS_LIVE } from "@/lib/config";
+import SignInPanel from "@/components/app/SignIn";
 
 type Params = { programId: string };
 
@@ -19,6 +21,8 @@ export default async function SubmitPage({ params }: { params: Promise<Params> }
   const p = await findProgramme((await params).programId);
   if (!p) notFound();
   const blocked = blockedReason(p);
+  // Live: reports are tied to a signed-in wallet, so sign in before writing one.
+  const signedIn = REPORTS_LIVE ? !!(await (await import("@/server/auth")).sessionFromCookies()) : true;
 
   return (
     <>
@@ -43,6 +47,8 @@ export default async function SubmitPage({ params }: { params: Promise<Params> }
             </Link>
           </p>
         </section>
+      ) : !signedIn ? (
+        <SignInPanel sentence={`Sign in with your wallet to report privately to ${p.project}. The report is tied to that wallet, and only you and the ${p.project} team can read it.`} />
       ) : (
         <ReportForm
           programme={{

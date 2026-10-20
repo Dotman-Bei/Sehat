@@ -76,6 +76,16 @@ export function session(req: Request): string | null {
     ?.split(/;\s*/)
     .find((c) => c.startsWith(`${COOKIE}=`))
     ?.slice(COOKIE.length + 1);
+  return walletFromCookie(raw);
+}
+
+/** Session for server components and pages (reads the request cookies). */
+export async function sessionFromCookies(): Promise<string | null> {
+  const { cookies } = await import("next/headers");
+  return walletFromCookie((await cookies()).get(COOKIE)?.value);
+}
+
+function walletFromCookie(raw: string | undefined): string | null {
   if (!raw) return null;
   const [payload, mac] = raw.split(".");
   if (!payload || !mac) return null;

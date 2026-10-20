@@ -10,6 +10,7 @@ import { ACTIVE_NETWORK, CHAIN_LIVE, PREVIEW_DATA, txUrl } from "@/lib/config";
 import { keccak256, type Hex } from "viem";
 import { browserSender, explainError, fundProgramme, registerProgramme } from "@/lib/tx";
 import { bot, TODAY } from "@/lib/format";
+import { programmeName } from "@/lib/status";
 import s from "./create.module.css";
 
 type Target = { target: string; kind: string; note: string };
@@ -387,7 +388,7 @@ export default function Builder() {
               {CHAIN_LIVE ? (
                 <div className={s.doneBox}>
                   <p className="cell-main">
-                    {project} {title} is listed as programme {register.programmeId}.
+                    {programmeName({ project, title })} is listed as programme {register.programmeId}.
                   </p>
                   <p className={s.hint}>
                     A registered, funded programme appears in the directory straight from the contract. There is no separate publish
@@ -400,7 +401,7 @@ export default function Builder() {
               ) : published ? (
                 <div className={s.doneBox}>
                   <p className="cell-main">
-                    {project} {title} is live.
+                    {programmeName({ project, title })} is live.
                   </p>
                   <p className={s.hint}>Researchers can read the scope and rules and submit reports. Reports arrive on your programme dashboard.</p>
                   {PREVIEW_DATA && <p className={s.previewNote}>Preview build: nothing was registered, funded or published.</p>}

@@ -20,6 +20,9 @@ import {
 } from "@/lib/sample-data";
 import { ACCEPTED, OPEN } from "@/lib/status";
 import { CHAIN_LIVE, REPORTS_LIVE } from "@/lib/config";
+import { useRouter } from "next/navigation";
+import SignInPanel from "@/components/app/SignIn";
+import { postJson } from "@/lib/live-report";
 import { age, bot, short, TODAY } from "@/lib/format";
 import s from "./admin.module.css";
 
@@ -33,21 +36,33 @@ const chainMetrics = (programmes: Programme[]) => ({
   paid: programmes.reduce((t, p) => t + paidOut(p), 0),
   payouts: programmes.flatMap((p) => p.events).filter((e) => e.kind === "paid").length,
 });
-const db = {
+const sampleDb = {
   reports: REPORTS.length,
   open: REPORTS.filter((r) => OPEN.includes(r.status)).length,
   accepted: REPORTS.filter((r) => ACCEPTED.includes(r.status)).length,
   researchers: new Set(REPORTS.map((r) => r.reporter)).size,
 };
 
-const targetLabel = (a: AbuseReport) => (a.targetKind === "programme" ? getProgramme(a.target)?.project ?? a.target : `Report ${a.target}`);
+export type LiveModeration = {
+  signedIn: boolean;
+  admin: boolean;
+  queue: AbuseReport[];
+  audit: AuditEntry[];
+  counts: { reports: number; open: number; accepted: number; researchers: number };
+};
 
-export default function Admin({ programmes }: { programmes: Programme[] }) {
+export default function Admin({ programmes, live }: { programmes: Programme[]; live?: LiveModeration }) {
   const chain = chainMetrics(programmes);
+  const db = live ? live.counts : sampleDb;
+  const names = new Map(programmes.map((p) => [p.id, p.project]));
+  const targetLabel = (a: AbuseReport) =>
+    a.targetKind === "programme" ? names.get(a.target) ?? getProgramme(a.target)?.project ?? `Programme ${a.target}` : `Report ${a.target}`;
   const w = useWallet();
-  const isAdmin = sameAddress(w.address, ADMIN_WALLET);
-  const [queue, setQueue] = useState<AbuseReport[]>(ABUSE_REPORTS);
-  const [log, setLog] = useState<AuditEntry[]>(AUDIT_LOG);
+  const router = useRouter();
+  const isAdmin = live ? live.admin : sameAddress(w.address, ADMIN_WALLET);
+  const [queue, setQueue] = useState<AbuseReport[]>(live ? live.queue : ABUSE_REPORTS);
+  const [log, setLog] = useState<AuditEntry[]>(live ? live.audit : AUDIT_LOG);
+  const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [action, setAction] = useState<"hide" | "dismiss">("dismiss");
   const [reason, setReason] = useState("");
@@ -71,7 +86,15 @@ export default function Admin({ programmes }: { programmes: Programme[] }) {
     </div>
   );
 
-  if (!w.address) {
+  if (live && !live.signedIn) {
+    return (
+      <>
+        {title}
+        <SignInPanel sentence="This area is for platform administrators. Sign in with an admin wallet." />
+      </>
+    );
+  }
+  if (!live && !w.address) {
     return (
       <>
         {title}
@@ -84,15 +107,27 @@ export default function Admin({ programmes }: { programmes: Programme[] }) {
       <>
         {title}
         <p className="empty" style={{ maxWidth: 720 }}>
-          This area is for platform administrators. {short(w.address)} is not one, so nothing is shown.
+          This area is for platform administrators. {live ? "The signed-in wallet" : short(w.address ?? "")} is not one, so nothing is shown.
         </p>
       </>
     );
   }
 
-  function decide(a: AbuseReport) {
+  async function decide(a: AbuseReport) {
     const why = reason.trim();
     if (why.length < 10) return;
+    if (live) {
+      setError(null);
+      try {
+        await postJson(`/api/abuse/${a.id}`, { action, reason: why });
+        setOpenId(null);
+        setReason("");
+        router.refresh();
+      } catch (e) {
+        setError((e as Error).message);
+      }
+      return;
+    }
     const verb = action === "hide" ? (a.targetKind === "programme" ? "Hid programme from directory" : "Rejected report as spam") : `Dismissed abuse report ${a.id}`;
     setQueue(queue.map((x) => (x.id === a.id ? { ...x, status: action === "hide" ? "hidden" : "dismissed" } : x)));
     setLog([{ date: `${TODAY} 10:42`, actor: "Admin · you", action: verb, target: a.target, reason: why }, ...log]);
@@ -157,6 +192,7 @@ export default function Admin({ programmes }: { programmes: Programme[] }) {
                         Reason for the audit log
                       </label>
                       <textarea id={`why-${a.id}`} className="textarea" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
+                      {error && <p className={s.note} style={{ color: "var(--negative)" }}>{error}</p>}
                       <div className={s.actions}>
                         <button type="button" className="btn" onClick={() => setOpenId(null)}>
                           Cancel
@@ -241,6 +277,9 @@ export default function Admin({ programmes }: { programmes: Programme[] }) {
           <h2 id="log-h">Audit log</h2>
           <span className="panel-meta">{log.length} entries · append-only</span>
         </div>
+        {log.length === 0 ? (
+          <p className="empty" style={{ marginTop: 8 }}>No moderation actions yet. Every decision is recorded here with its reason.</p>
+        ) : (
         <table className={`table ${s.log}`}>
           <thead>
             <tr>
@@ -272,6 +311,7 @@ export default function Admin({ programmes }: { programmes: Programme[] }) {
             ))}
           </tbody>
         </table>
+        )}
       </section>
     </>
   );

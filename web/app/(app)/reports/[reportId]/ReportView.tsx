@@ -1,23 +1,18 @@
 "use client";
 
-// In production the report body is fetched from the private reports API, which checks the
-// signed-in wallet on every read; nothing here is a substitute for that server-side check.
+// Live mode: the server page loads the report through the access-checked reports service and passes
+// it here with the viewer's role; actions go back through the API. Preview mode: sample reports.
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import ConnectPrompt from "@/components/app/ConnectPrompt";
 import Hash from "@/components/app/Hash";
 import { sameAddress, useWallet } from "@/lib/wallet";
-import {
-  type Message,
-  type ReportStatus,
-  type Severity,
-  balance,
-  fakeHex,
-  getProgramme,
-  getReport,
-} from "@/lib/sample-data";
-import { ACTIVE_NETWORK, REPORTS_LIVE, txUrl } from "@/lib/config";
+import { type Message, type Programme, type Report, type ReportStatus, type Severity, balance, fakeHex } from "@/lib/sample-data";
+import { type LiveExtra, postJson } from "@/lib/live-report";
+import { browserSender, explainError, releaseReward } from "@/lib/tx";
+import { ACTIVE_NETWORK, txUrl } from "@/lib/config";
 import { bot, short, TODAY } from "@/lib/format";
 import { REPORT_STATUS, pillClass } from "@/lib/status";
 import s from "./report.module.css";
@@ -41,15 +36,16 @@ const DECISIONS: { status: ReportStatus; label: string; needsReason: boolean }[]
 
 type Tx = { phase: "idle" | "confirm" | "wallet" | "pending" | "confirmed" | "failed"; hash?: string; block?: number; error?: string };
 
-export default function ReportView({ reportId }: { reportId: string }) {
-  const report = getReport(reportId)!;
-  const p = getProgramme(report.programmeId)!;
+export default function ReportView({ report, programme: p, live }: { report: Report; programme: Programme; live?: LiveExtra }) {
   const w = useWallet();
+  const router = useRouter();
 
-  const isResearcher = sameAddress(w.address, report.reporter);
-  const isOwner = sameAddress(w.address, p.owner);
-  const isTriager = p.triagers.some((t) => sameAddress(t.wallet, w.address));
+  // Live: the server decided the role from the signed-in session. Preview: compare sample wallets.
+  const isResearcher = live ? live.role === "researcher" : sameAddress(w.address, report.reporter);
+  const isOwner = live ? live.role === "owner" : sameAddress(w.address, p.owner);
+  const isTriager = live ? live.role === "triager" : p.triagers.some((t) => sameAddress(t.wallet, w.address));
   const isTeam = isOwner || isTriager;
+  const recipient = live ? live.payoutWallet : report.reporter;
 
   const [status, setStatus] = useState<ReportStatus>(report.status);
   const [confirmed, setConfirmed] = useState<Severity | undefined>(report.confirmed);
@@ -77,7 +73,7 @@ export default function ReportView({ reportId }: { reportId: string }) {
     </div>
   );
 
-  if (!w.address) {
+  if (!live && !w.address) {
     return (
       <>
         {title}
@@ -85,12 +81,12 @@ export default function ReportView({ reportId }: { reportId: string }) {
       </>
     );
   }
-  if (!isResearcher && !isTeam) {
+  if (!live && !isResearcher && !isTeam) {
     return (
       <>
         {title}
         <p className="empty" style={{ maxWidth: 720 }}>
-          This report is private to its researcher and the {p.project} team. The connected wallet {short(w.address)} is neither, so nothing
+          This report is private to its researcher and the {p.project} team. The connected wallet {short(w.address ?? "")} is neither, so nothing
           about it is shown.
         </p>
       </>
@@ -151,13 +147,19 @@ export default function ReportView({ reportId }: { reportId: string }) {
             <h3 className={s.h3}>Attachments</h3>
             {report.attachments.length ? (
               <ul className={s.files}>
-                {report.attachments.map((a) => (
-                  <li key={a.name}>
+                {report.attachments.map((a, i) => (
+                  <li key={a.name + i}>
                     <span>{a.name}</span>
                     <span className="dash num">{a.size}</span>
-                    <button className="btn btn-text" disabled={!REPORTS_LIVE} title={!REPORTS_LIVE ? "Sample report: no files are stored" : undefined}>
-                      Download
-                    </button>
+                    {live ? (
+                      <a className="btn btn-text" href={`/api/attachments/${live.attachmentIds[i]}`} download>
+                        Download
+                      </a>
+                    ) : (
+                      <button className="btn btn-text" disabled title="Sample report: no files are stored">
+                        Download
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -170,7 +172,19 @@ export default function ReportView({ reportId }: { reportId: string }) {
             visible={visible}
             isTeam={isTeam}
             project={p.project}
-            onSend={(m) => setThread((t) => [...t, m])}
+            onSend={async (m) => {
+              if (!live) {
+                setThread((t) => [...t, m]);
+                return null;
+              }
+              try {
+                await postJson(`/api/reports/${live.key}/messages`, { body: m.body, teamOnly: m.teamOnly });
+                router.refresh();
+                return null;
+              } catch (e) {
+                return (e as Error).message;
+              }
+            }}
             teamName={isOwner ? `${p.project} owner` : p.triagers.find((t) => sameAddress(t.wallet, w.address))?.name ?? "Team"}
           />
         </div>
@@ -203,11 +217,21 @@ export default function ReportView({ reportId }: { reportId: string }) {
               confirmed={confirmed}
               tiers={p.tiers}
               escrow={escrow}
-              onDecide={(st, why, sev, amount) => {
+              onDecide={async (st, why, sev, amount, amountText) => {
+                if (live) {
+                  try {
+                    await postJson(`/api/reports/${live.key}/triage`, { status: st, reason: why, confirmed: sev, reward: amountText });
+                    router.refresh();
+                    return null;
+                  } catch (e) {
+                    return (e as Error).message;
+                  }
+                }
                 setStatus(st);
                 setReason(why);
                 if (sev) setConfirmed(sev);
                 if (amount) setReward(amount);
+                return null;
               }}
             />
           )}
@@ -226,7 +250,7 @@ export default function ReportView({ reportId }: { reportId: string }) {
                 <dl className="kv" style={{ marginTop: 12 }}>
                   <dt>Recipient</dt>
                   <dd>
-                    <Hash value={report.reporter} />
+                    <Hash value={recipient} />
                   </dd>
                   <dt>Escrow available</dt>
                   <dd className="num">{bot(escrow)} BOT</dd>
@@ -236,7 +260,11 @@ export default function ReportView({ reportId }: { reportId: string }) {
                   isResearcher={isResearcher}
                   project={p.project}
                   reportId={report.id}
-                  recipient={report.reporter}
+                  recipient={recipient}
+                  live={live && { ...live, digest: report.digest }}
+                  ownerWallet={p.owner}
+                  connected={w.address}
+                  onRecorded={() => router.refresh()}
                   amount={reward}
                   escrow={balance(p)}
                   tx={tx}
@@ -274,9 +302,23 @@ export default function ReportView({ reportId }: { reportId: string }) {
   );
 }
 
-function Thread({ visible, isTeam, project, onSend, teamName }: { visible: Message[]; isTeam: boolean; project: string; onSend: (m: Message) => void; teamName: string }) {
+function Thread({
+  visible,
+  isTeam,
+  project,
+  onSend,
+  teamName,
+}: {
+  visible: Message[];
+  isTeam: boolean;
+  project: string;
+  onSend: (m: Message) => Promise<string | null>;
+  teamName: string;
+}) {
   const [text, setText] = useState("");
   const [teamOnly, setTeamOnly] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   return (
     <section className="panel" aria-labelledby="thread-h">
       <div className="panel-head">
@@ -290,7 +332,9 @@ function Thread({ visible, isTeam, project, onSend, teamName }: { visible: Messa
           {visible.map((m, i) => (
             <li key={i} className={s.msg} data-team-only={m.teamOnly || undefined}>
               <p className={s.msgHead}>
-                <span className="cell-main">{m.from === "researcher" ? (isTeam ? "Researcher" : "You") : m.author}</span>
+                <span className="cell-main">
+                  {m.from === "researcher" ? (isTeam ? "Researcher" : "You") : /^0x[0-9a-fA-F]{40}$/.test(m.author) ? `${project} team · ${short(m.author)}` : m.author}
+                </span>
                 {m.teamOnly && <span className={s.teamOnly}>Team only</span>}
                 <span className="dash num">{m.date}</span>
               </p>
@@ -301,11 +345,14 @@ function Thread({ visible, isTeam, project, onSend, teamName }: { visible: Messa
       )}
       <form
         className={s.composer}
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          if (!text.trim()) return;
-          onSend({ from: isTeam ? "team" : "researcher", author: isTeam ? teamName : "You", date: TODAY, body: text.trim(), teamOnly: isTeam && teamOnly });
-          setText("");
+          if (!text.trim() || sending) return;
+          setSending(true);
+          const err = await onSend({ from: isTeam ? "team" : "researcher", author: isTeam ? teamName : "You", date: TODAY, body: text.trim(), teamOnly: isTeam && teamOnly });
+          setSending(false);
+          setError(err);
+          if (!err) setText("");
         }}
       >
         <label htmlFor="reply" className="visually-hidden">
@@ -318,10 +365,11 @@ function Thread({ visible, isTeam, project, onSend, teamName }: { visible: Messa
               <input type="checkbox" checked={teamOnly} onChange={(e) => setTeamOnly(e.target.checked)} /> Team only
             </label>
           )}
-          <button className="btn btn-primary" disabled={!text.trim()}>
-            {isTeam && teamOnly ? "Add note" : "Send"}
+          <button className="btn btn-primary" disabled={!text.trim() || sending}>
+            {sending ? "Sending…" : isTeam && teamOnly ? "Add note" : "Send"}
           </button>
         </div>
+        {error && <p className={s.err}>{error}</p>}
       </form>
     </section>
   );
@@ -338,8 +386,10 @@ function Triage({
   confirmed?: Severity;
   tiers: { severity: Severity; min: number; max: number }[];
   escrow: number;
-  onDecide: (s: ReportStatus, reason: string, sev?: Severity, amount?: number) => void;
+  onDecide: (s: ReportStatus, reason: string, sev?: Severity, amount?: number, amountText?: string) => Promise<string | null>;
 }) {
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [decision, setDecision] = useState<ReportStatus>(status === "submitted" ? "triage" : status);
   const [why, setWhy] = useState("");
   const [sev, setSev] = useState<Severity | "">(confirmed ?? "");
@@ -367,10 +417,12 @@ function Triage({
       </div>
       <form
         className={s.triage}
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          if (!ready) return;
-          onDecide(accepting ? "reward_agreed" : decision, why.trim(), sev || undefined, accepting ? n : undefined);
+          if (!ready || busy) return;
+          setBusy(true);
+          setError(await onDecide(accepting ? "reward_agreed" : decision, why.trim(), sev || undefined, accepting ? n : undefined, accepting ? amount.replace(/,/g, "").trim() : undefined));
+          setBusy(false);
         }}
       >
         <label className={s.label} htmlFor="t-decision">
@@ -397,7 +449,7 @@ function Triage({
             <label className={s.label} htmlFor="t-amount">
               Proposed reward (BOT)
             </label>
-            <input id="t-amount" className="input num" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={tier ? `${bot(tier.min)}–${bot(tier.max)}` : "Confirm a severity first"} aria-invalid={!!amountError} />
+            <input id="t-amount" className="input num" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={tier ? `${bot(tier.min)}–${bot(tier.max)}` : "Confirm a severity first"} aria-invalid={!!amountError} />
             {amountError && <p className={s.err}>{amountError}</p>}
           </>
         )}
@@ -409,9 +461,10 @@ function Triage({
             <textarea id="t-why" className="textarea" rows={2} value={why} onChange={(e) => setWhy(e.target.value)} />
           </>
         )}
-        <button className="btn btn-primary" disabled={!ready}>
-          {accepting ? "Accept and propose reward" : `Mark as ${d.label.toLowerCase()}`}
+        <button className="btn btn-primary" disabled={!ready || busy}>
+          {busy ? "Saving…" : accepting ? "Accept and propose reward" : `Mark as ${d.label.toLowerCase()}`}
         </button>
+        {error && <p className={s.err}>{error}</p>}
         {accepting && <p className={s.note}>The researcher sees the amount before anything is paid.</p>}
       </form>
     </section>
@@ -430,6 +483,10 @@ function Release({
   setTx,
   onPaid,
   wrongChain,
+  live,
+  ownerWallet,
+  connected,
+  onRecorded,
 }: {
   canRelease: boolean;
   isResearcher: boolean;
@@ -442,6 +499,10 @@ function Release({
   setTx: (t: Tx) => void;
   onPaid: () => void;
   wrongChain: boolean;
+  live?: LiveExtra & { digest: string };
+  ownerWallet: string;
+  connected: string | null;
+  onRecorded: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -449,7 +510,32 @@ function Release({
     else dialog.current?.close();
   }, [tx.phase]);
 
+  async function sendLive() {
+    if (!live || !live.rewardText) return;
+    let hash: string | undefined;
+    try {
+      setTx({ phase: "wallet" });
+      const receipt = await releaseReward(browserSender(connected!), live.programmeId, live.digest as `0x${string}`, live.payoutWallet as `0x${string}`, live.rewardText, (h) => {
+        hash = h;
+        setTx({ phase: "pending", hash: h });
+      });
+      setTx({ phase: "pending", hash: receipt.transactionHash });
+      try {
+        await postJson(`/api/reports/${live.key}/paid`, { txHash: receipt.transactionHash });
+      } catch (e) {
+        // Paid on-chain; recording failed. Show the payout so nobody pays twice; the contract would refuse anyway.
+        setTx({ phase: "confirmed", hash: receipt.transactionHash, block: Number(receipt.blockNumber), error: `Paid on-chain, but the report could not be updated: ${(e as Error).message}` });
+        return;
+      }
+      setTx({ phase: "confirmed", hash: receipt.transactionHash, block: Number(receipt.blockNumber) });
+      onRecorded();
+    } catch (e) {
+      setTx({ phase: "failed", hash, error: explainError(e) });
+    }
+  }
+
   function send() {
+    if (live) return void sendLive();
     setTx({ phase: "wallet" });
     setTimeout(() => {
       const hash = fakeHex(`release-${reportId}-${amount}`);
@@ -468,6 +554,7 @@ function Release({
           <span className="pill pill-positive">Paid</span> in block <span className="num">{bot(tx.block ?? 0)}</span>
         </p>
         <Hash value={tx.hash} href={txUrl(tx.hash)} head={6} tail={6} />
+        {tx.error && <p className={s.err}>{tx.error}</p>}
         <p className={s.note}>A second release for {reportId} is refused by the contract.</p>
       </div>
     );
@@ -482,13 +569,15 @@ function Release({
   }
 
   const over = amount > escrow;
+  const walletMismatch = !!live && !sameAddress(connected, ownerWallet);
   return (
     <div className={s.release}>
       {tx.phase === "idle" || tx.phase === "confirm" || tx.phase === "failed" ? (
         <>
-          <button className="btn btn-primary" disabled={over || wrongChain} onClick={() => setTx({ phase: "confirm" })}>
+          <button className="btn btn-primary" disabled={over || wrongChain || walletMismatch} onClick={() => setTx({ phase: "confirm" })}>
             Release {bot(amount)} BOT
           </button>
+          {walletMismatch && <p className={s.err}>Connect the programme owner&rsquo;s wallet ({short(ownerWallet)}) to release this reward.</p>}
           {over && <p className={s.err}>Escrow holds {bot(escrow)} BOT; add funds before releasing {bot(amount)} BOT.</p>}
           {wrongChain && <p className={s.err}>Switch the wallet to {ACTIVE_NETWORK.name} first.</p>}
           {tx.phase === "failed" && <p className={s.err}>{tx.error}</p>}
@@ -502,7 +591,7 @@ function Release({
           <li data-state="next">Paid</li>
         </ol>
       )}
-      {!REPORTS_LIVE && (tx.phase === "wallet" || tx.phase === "pending") && <p className={s.previewNote}>Sample report: no transaction is sent.</p>}
+      {!live && (tx.phase === "wallet" || tx.phase === "pending") && <p className={s.previewNote}>Sample report: no transaction is sent.</p>}
 
       <dialog ref={dialog} className={s.dialog} onClose={() => tx.phase === "confirm" && setTx({ phase: "idle" })} aria-labelledby="dlg-h">
         <h2 id="dlg-h">Release {bot(amount)} BOT to the researcher?</h2>

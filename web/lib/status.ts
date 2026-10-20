@@ -48,3 +48,7 @@ export function blockedReason(p: Programme): string | null {
   return null;
 }
 
+
+/** "Quayside Bridge relayer…", without repeating the project when the title already starts with it. */
+export const programmeName = (p: { project: string; title: string }) =>
+  p.title.toLowerCase().startsWith(p.project.toLowerCase()) ? p.title : `${p.project} ${p.title}`;

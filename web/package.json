@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:chain": "sh scripts/test-chain.sh",
-    "test:reports": "sh scripts/test-reports.sh"
+    "test:reports": "sh scripts/test-reports.sh",
+    "test:ui": "sh scripts/test-ui.sh"
   },
   "dependencies": {
     "next": "15.5.28",

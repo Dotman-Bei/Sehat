@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { signOut } from "./SignIn";
 import { useEffect, useRef, useState } from "react";
 import { IconBoard, IconFlag, IconHome, IconPlus, IconReports, IconVault, Mark } from "./icons";
 import { ACTIVE_NETWORK, CHAIN_LIVE, REPORTS_LIVE } from "@/lib/config";
@@ -49,7 +50,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     };
   }, [address]);
   const ownedId = CHAIN_LIVE ? ownedOnChain : PROGRAMMES.find((p) => sameAddress(p.owner, address))?.id;
-  const isAdmin = sameAddress(address, ADMIN_WALLET);
+  const me = useMe();
+  const isAdmin = REPORTS_LIVE ? me.admin : sameAddress(address, ADMIN_WALLET);
 
   const nav = [
     { href: "/programs", label: "Programmes", icon: <IconBoard />, active: path === "/programs" || (/^\/programs\/(?!create)/.test(path)) },
@@ -126,8 +128,28 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Live reports mode: who the server thinks is signed in. */
+function useMe() {
+  const [me, setMe] = useState<{ address: string | null; admin: boolean }>({ address: null, admin: false });
+  const path = usePathname();
+  useEffect(() => {
+    if (!REPORTS_LIVE) return;
+    let live = true;
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => live && setMe({ address: d.address ?? null, admin: !!d.admin }))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [path]);
+  return me;
+}
+
 function WalletButton() {
   const w = useWallet();
+  const me = useMe();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -172,6 +194,24 @@ function WalletButton() {
             <>
               <p className="menu-label">Connected {w.kind === "preview" ? "as a preview identity" : "wallet"}</p>
               <p className="menu-item num" style={{ cursor: "default" }}>{short(w.address, 8, 6)}</p>
+              {REPORTS_LIVE && (
+                <p className="menu-label">
+                  {me.address ? `Signed in to Sehat as ${short(me.address)}${me.admin ? " · admin" : ""}` : "Not signed in to Sehat"}
+                </p>
+              )}
+              {REPORTS_LIVE && me.address && (
+                <button
+                  className="menu-item"
+                  role="menuitem"
+                  onClick={async () => {
+                    await signOut().catch(() => {});
+                    setOpen(false);
+                    router.refresh();
+                  }}
+                >
+                  Sign out of Sehat
+                </button>
+              )}
               <button className="menu-item" role="menuitem" onClick={() => { w.disconnect(); setOpen(false); }}>
                 Disconnect
               </button>

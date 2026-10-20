@@ -18,9 +18,10 @@ import {
   reportsFor,
 } from "@/lib/sample-data";
 import { CHAIN_LIVE, REPORTS_LIVE, addressUrl, txUrl } from "@/lib/config";
+import SignInPanel from "@/components/app/SignIn";
 import { type Sender, browserSender, explainError, fundProgramme, setProgrammePaused, startClosing, withdrawUnused } from "@/lib/tx";
-import { age, bot, daysAgo, initials, short } from "@/lib/format";
-import { CLOSED_WITHOUT_REWARD, REPORT_STATUS, pillClass, programmeState } from "@/lib/status";
+import { ago, bot, daysAgo, initials, short } from "@/lib/format";
+import { CLOSED_WITHOUT_REWARD, REPORT_STATUS, pillClass, programmeName, programmeState } from "@/lib/status";
 import s from "./manage.module.css";
 
 const TABS = [
@@ -41,11 +42,19 @@ const DISC_TINTS = [
 type Act = { phase: "idle" | "wallet" | "pending" | "done" | "failed"; hash?: string; error?: string };
 const IDLE: Act = { phase: "idle" };
 
-export default function Manage({ programme: p }: { programme: Programme }) {
+export type LiveQueue = {
+  signedIn: boolean;
+  reports: Report[];
+  keys: Record<string, string>;
+  triagers: { wallet: string; name: string }[];
+};
+
+export default function Manage({ programme: p, live }: { programme: Programme; live?: LiveQueue }) {
   const w = useWallet();
   const router = useRouter();
   const isOwner = sameAddress(w.address, p.owner);
-  const isTriager = p.triagers.some((t) => sameAddress(t.wallet, w.address));
+  const isTriager = (live ? live.triagers : p.triagers).some((t) => sameAddress(t.wallet, w.address));
+  const href = (r: Report) => `/reports/${live ? live.keys[r.id] : r.id}`;
 
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("new");
   const [showAll, setShowAll] = useState(false);
@@ -85,15 +94,38 @@ export default function Manage({ programme: p }: { programme: Programme }) {
       set({ phase: "failed", hash, error: explainError(e) });
     }
   }
-  const [triagers, setTriagers] = useState(p.triagers);
+  const [triagers, setTriagers] = useState(live ? live.triagers : p.triagers);
+  const [newName, setNewName] = useState("");
+  const [triagerError, setTriagerError] = useState<string | null>(null);
+
+  async function changeTriagers(add: { wallet: string; name: string } | null, remove: string | null) {
+    setTriagerError(null);
+    if (!live) {
+      if (add) setTriagers([...triagers, add]);
+      if (remove) setTriagers(triagers.filter((x) => x.wallet !== remove));
+      return;
+    }
+    try {
+      const res = await fetch(`/api/programmes/${p.onChain?.programmeId}/triagers${remove ? `?wallet=${remove}` : ""}`, {
+        method: remove ? "DELETE" : "POST",
+        headers: { "content-type": "application/json" },
+        body: add ? JSON.stringify(add) : undefined,
+      });
+      const data = (await res.json()) as { triagers?: { wallet: string; name: string }[]; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Could not update triagers.");
+      setTriagers(data.triagers ?? []);
+    } catch (e) {
+      setTriagerError((e as Error).message);
+    }
+  }
   const [newTriager, setNewTriager] = useState("");
 
-  const reports = reportsFor(p.id);
+  const reports = live ? live.reports : reportsFor(p.id);
   const added = !CHAIN_LIVE && fundTx.phase === "done" ? fundTx.amount ?? 0 : 0;
   const total = funded(p) + added;
   const paid = paidOut(p);
   const left = balance(p) + added;
-  const agreed = agreedUnpaid(p);
+  const agreed = live ? reports.filter((r) => r.status === "reward_agreed").reduce((t, r) => t + (r.reward ?? 0), 0) : agreedUnpaid(p);
   const free = left - agreed;
   const waiting = reports.filter((r) => r.status === "submitted").sort((a, b) => a.submitted.localeCompare(b.submitted));
   const awaitingRelease = reports.filter((r) => r.status === "reward_agreed");
@@ -103,13 +135,13 @@ export default function Manage({ programme: p }: { programme: Programme }) {
     <div className="title-row">
       <div>
         <h1>
-          {p.project} {p.title}
+          {programmeName(p)}
         </h1>
         {(isOwner || isTriager) && (
           <p className="subline">
             {waiting.length > 0 ? (
               <strong>
-                {waiting.length} {waiting.length === 1 ? "report waits" : "reports wait"} for triage; the oldest is {age(waiting[0].submitted).toLowerCase()} old.
+                {waiting.length} {waiting.length === 1 ? "report waits" : "reports wait"} for triage; the oldest arrived {ago(waiting[0].submitted)}.
               </strong>
             ) : (
               "Nothing waits for triage."
@@ -296,7 +328,7 @@ export default function Manage({ programme: p }: { programme: Programme }) {
                     <p className="num cell-main">
                       {bot(r.reward ?? 0)} <span className="unit">BOT</span>
                     </p>
-                    <Link href={`/reports/${r.id}`} className="btn btn-primary">
+                    <Link href={href(r)} className="btn btn-primary">
                       Review and release
                     </Link>
                   </div>
@@ -343,6 +375,10 @@ export default function Manage({ programme: p }: { programme: Programme }) {
             Reports and triage run through the private reports service, which is not connected to this build yet. The escrow figures and
             controls on this page are live.
           </p>
+        ) : live && !live.signedIn ? (
+          <div style={{ marginTop: 8 }}>
+            <SignInPanel sentence={`Sign in with the ${p.project} owner wallet or a triager wallet to see this programme's reports.`} />
+          </div>
         ) : (
         <>
         <div className="tabs" role="tablist" aria-label="Report status">
@@ -373,7 +409,7 @@ export default function Manage({ programme: p }: { programme: Programme }) {
                 const st = REPORT_STATUS[r.status];
                 const days = daysAgo(r.submitted);
                 return (
-                  <tr key={r.id} className="clickable" onClick={() => router.push(`/reports/${r.id}`)}>
+                  <tr key={r.id} className="clickable" onClick={() => router.push(href(r))}>
                     <td className={s.ident}>
                       <span className="cell-main">{r.title}</span>
                       <span className={`${pillClass(st.tone)} ${s.phonePill}`}>{st.label}</span>
@@ -396,7 +432,7 @@ export default function Manage({ programme: p }: { programme: Programme }) {
                     <td className="num">
                       {r.status === "submitted" ? (
                         <>
-                          {days} {days === 1 ? "day" : "days"}
+                          {days === 0 ? "Today" : `${days} ${days === 1 ? "day" : "days"}`}
                           <div className="cell-sub">since {r.submitted}</div>
                         </>
                       ) : (
@@ -407,7 +443,7 @@ export default function Manage({ programme: p }: { programme: Programme }) {
                       )}
                     </td>
                     <td className="num">
-                      <Link href={`/reports/${r.id}`} className="btn" onClick={(e) => e.stopPropagation()}>
+                      <Link href={href(r)} className="btn" onClick={(e) => e.stopPropagation()}>
                         {r.status === "submitted" ? "Triage" : r.status === "reward_agreed" ? "Release" : "Open"}
                       </Link>
                     </td>
@@ -537,7 +573,7 @@ export default function Manage({ programme: p }: { programme: Programme }) {
                   </span>
                 </span>
                 {isOwner && reportsConnected ? (
-                  <button className="btn btn-text" onClick={() => setTriagers(triagers.filter((x) => x.wallet !== t.wallet))}>
+                  <button className="btn btn-text" onClick={() => changeTriagers(null, t.wallet)}>
                     Remove
                   </button>
                 ) : (
@@ -557,19 +593,26 @@ export default function Manage({ programme: p }: { programme: Programme }) {
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!/^0x[0-9a-fA-F]{40}$/.test(newTriager.trim())) return;
-                setTriagers([...triagers, { name: `Triager ${short(newTriager.trim())}`, wallet: newTriager.trim() }]);
-                setNewTriager("");
+                void changeTriagers({ wallet: newTriager.trim(), name: newName.trim() || `Triager ${short(newTriager.trim())}` }, null).then(() => {
+                  setNewTriager("");
+                  setNewName("");
+                });
               }}
             >
               <label htmlFor="new-triager" className="visually-hidden">
                 Triager wallet address
               </label>
               <input id="new-triager" className="input num" placeholder="0x… wallet address" value={newTriager} onChange={(e) => setNewTriager(e.target.value)} />
+              <label htmlFor="new-triager-name" className="visually-hidden">
+                Triager name
+              </label>
+              <input id="new-triager-name" className="input" placeholder="Name" value={newName} onChange={(e) => setNewName(e.target.value)} style={{ maxWidth: 160 }} />
               <button className="btn" disabled={!/^0x[0-9a-fA-F]{40}$/.test(newTriager.trim())}>
                 Add triager
               </button>
             </form>
           )}
+          {triagerError && <p className={s.err} style={{ marginTop: 8 }}>{triagerError}</p>}
         </section>
       </div>
     </>

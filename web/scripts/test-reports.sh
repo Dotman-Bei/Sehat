@@ -4,6 +4,13 @@
 set -e
 cd "$(dirname "$0")/.."
 
+# Stops whatever listens on a port (the dev server's child survives a plain kill on Windows).
+free_port() {
+  pid=$(netstat -ano 2>/dev/null | grep ":$1 .*LISTEN" | awk '{print $NF}' | head -1)
+  [ -n "$pid" ] && { taskkill //F //T //PID "$pid" >/dev/null 2>&1 || kill "$pid" 2>/dev/null; } || true
+}
+port_busy() { netstat -ano 2>/dev/null | grep -q ":$1 .*LISTEN"; }
+
 FORK_PORT=8551
 APP_PORT=3400
 RUN=".data/test-$(date +%s)"
@@ -22,11 +29,13 @@ export SEHAT_ADMINS=$(cast wallet address "$ADMIN_KEY" | tr 'A-F' 'a-f')
 export APP=http://localhost:$APP_PORT
 export SERVER_LOG="$RUN/server.log"
 
+for p in $APP_PORT $FORK_PORT; do port_busy $p && { echo "port $p is in use; stop it first"; exit 1; }; done
+
 anvil --silent --port $FORK_PORT --fork-url https://rpc.bohr.life &
 ANVIL=$!
 NEXT_DIST_DIR=.next-test npx next dev -p $APP_PORT > "$SERVER_LOG" 2>&1 &
 NEXT=$!
-cleanup() { kill $ANVIL $NEXT 2>/dev/null || true; }
+cleanup() { kill $ANVIL $NEXT 2>/dev/null || true; free_port $APP_PORT; free_port $FORK_PORT; }
 trap cleanup EXIT
 
 for i in $(seq 1 30); do cast chain-id --rpc-url $NEXT_PUBLIC_SEHAT_RPC >/dev/null 2>&1 && break; sleep 1; done

@@ -5,49 +5,88 @@ the escrow contract in `../contracts`.
 
 ## Modes
 
-| Mode | When | Programmes, balances, escrow history | Reports, threads, triage |
+| Mode | Set | Programmes, balances, escrow | Reports, threads, triage, moderation |
 |---|---|---|---|
-| Preview | `NEXT_PUBLIC_SEHAT_ESCROW` unset | Sample data (`lib/sample-data.ts`) | Sample data |
-| Chain live | `NEXT_PUBLIC_SEHAT_ESCROW` set | Read from the escrow contract; owner actions are real transactions | Sample data, labelled, until the reports API exists |
+| Preview | nothing | Sample data (`lib/sample-data.ts`) | Sample data |
+| Chain live | `NEXT_PUBLIC_SEHAT_ESCROW` | Read from the escrow contract; owner actions are wallet transactions | Sample data, labelled |
+| Full live | escrow + `NEXT_PUBLIC_SEHAT_REPORTS=live` | As above | The private reports service in `server/` and `app/api/` |
 
-Every app screen states which data is sample. Preview identities (researcher, owner, admin) appear in
-the wallet menu, or with `?as=researcher|owner|admin`, only while reports are sample data.
+Every screen states which data is sample. Preview identities (`?as=researcher|owner|admin`) exist only
+while reports are sample data.
 
 ## Environment
 
 Copy `.env.example` to `.env.local`.
 
 ```sh
-NEXT_PUBLIC_SEHAT_NETWORK=testnet                       # or mainnet
+NEXT_PUBLIC_SEHAT_NETWORK=testnet
 NEXT_PUBLIC_SEHAT_ESCROW=0xbC555De32fb45a8FF3297cbbc1a6F50F7674Bb54   # Bohr testnet deployment
 NEXT_PUBLIC_SEHAT_ESCROW_BLOCK=27529541                 # deploy block; event scans start here
-# NEXT_PUBLIC_SEHAT_RPC=http://127.0.0.1:8545           # optional RPC override (local fork)
+NEXT_PUBLIC_SEHAT_REPORTS=live                          # turn on the reports service
+SEHAT_SESSION_SECRET=<32+ random characters>            # required in production
+SEHAT_ADMINS=0xabc…,0xdef…                              # lowercase admin wallets (moderation only)
+# SEHAT_DB_FILE=.data/sehat.db                          # default
+# NEXT_PUBLIC_SEHAT_RPC=http://127.0.0.1:8545           # RPC override (local fork)
 ```
 
-## How chain data works
+## Chain data
 
-- `lib/chain.ts` reads contract state (`getProgramme`, `programmeCount`) and escrow events with viem.
-- `lib/programmes.ts` (server) builds each programme from contract state, its events and its public
-  metadata. The metadata file is fetched from the URI in `ProgrammeRegistered` or the latest
-  `MetadataUpdated`, and shown only if its keccak256 matches the hash stored on-chain. Otherwise the
-  page says it could not be verified, and the programme takes no reports.
-- Balances shown are contract state, never sums computed by the app. If the RPC's event index lags,
-  the history is marked as catching up.
-- Time rules (the closing window) are judged by the time of the block the page was read at.
+- `lib/chain.ts` reads contract state and escrow events; `lib/programmes.ts` (server) builds each
+  programme from them and from its public metadata, shown only if its keccak256 matches the hash stored
+  on-chain. Balances shown are contract state; time rules use block time.
 - `lib/tx.ts` sends `register`, `fund`, `setPaused`, `startClosing`, `withdrawUnused` and
-  `releaseReward`. Each is simulated first, so contract refusals appear in plain words before the wallet
-  prompts, and reported done only after a successful receipt.
-- Metadata for programmes registered by this team can be served from `public/metadata/<chainId>/<id>.json`.
-  Those files are hashed on-chain: never edit them, and `.gitattributes` stops line-ending conversion.
+  `releaseReward`, each simulated first and reported done only after a successful receipt.
+
+## Reports service
+
+**Sign-in.** Sign-In with Ethereum (EIP-4361): the wallet signs a one-time message (no transaction,
+no gas). Nonces are single-use and expire after 10 minutes; the signature is verified for ordinary and
+smart-contract wallets. The session is a 12-hour HMAC-signed, HTTP-only, SameSite=Lax cookie.
+
+**Who can read a report.** Its researcher, the programme owner (read from the contract on each check,
+cached 15 seconds) and triagers the owner authorised. Everyone else gets the same "not found" as for a
+missing report. Team-only notes are hidden from the researcher. Platform admins see counts and abuse
+reports, never report contents. Links use a random ID; references like SHT-0001 are for people.
+
+**What goes on-chain.** Only `keccak256(abi.encode(ref, salt))`, with a random 32-byte salt that never
+leaves the server, plus the recipient and the amount, in the payout event. A report is marked paid only
+after the server finds a `RewardReleased` event with that digest, the payout wallet and the agreed amount
+in a successful receipt.
+
+**Rules enforced on the server.** Every field is validated. The programme must exist on-chain, verify
+its metadata, accept reports and not be hidden. Triage transitions are limited, decisions that close a
+report need a reason, only the owner agrees rewards (within the tier range and the escrow balance), and
+paid or agreed reports cannot be re-triaged. Writes must come from this site (origin check). There are
+rate limits on sign-in, reports, messages, uploads and abuse reports.
+
+**Attachments.** At most 5 per report and 10 MB each; PDF, PNG, JPEG or UTF-8 text, decided from the
+bytes. Stored under `.data/attachments/` outside the web root, never executed, and served only as
+downloads behind the report's access check, with `nosniff` and a sandboxing CSP.
+
+**Logs.** The server logs the route and the error class only, never request bodies or report text.
+The end-to-end test checks this.
+
+**Storage and retention.** SQLite in `.data/sehat.db` (git-ignored). Back it up and encrypt the disk at
+rest. Swap `server/db.ts` for Postgres to run more than one server. Reports, threads, history and
+attachments are kept for the life of the programme plus its disclosure window. Deleting a report's
+contents must keep its digest, so a paid reference stays traceable. Retention periods and deletion
+requests need a written policy before mainnet. Reports are not end-to-end encrypted.
+
+**Known limits.** The contract cannot see reports, so closing a programme with unresolved reports is
+the owner's responsibility within the closing window. A compromised owner wallet can agree and release
+rewards up to the escrow balance. Disputes are not adjudicated. Moderation can hide programmes and
+close spam, not move funds.
 
 ## Commands
 
 ```sh
-npm run dev                # preview mode unless .env.local sets the escrow address
+npm run dev
 npm run build
 npm run lint
-npm run test:chain         # live reads from Bohr + every write path on a local anvil fork (needs Foundry)
+npm run test:chain     # live reads from Bohr + every write path on an anvil fork
+npm run test:reports   # reports API end to end: auth, access, triage, attachments, verified payout, moderation
+npm run test:ui        # the whole flow clicked through the browser, on a fork with a throwaway database
 ```
 
-`release` is wired in `lib/tx.ts` and tested, but no screen calls it yet: a release needs a real
-report digest from the reports API.
+The tests need Foundry (`anvil`, `cast`) and Chrome or Edge. They never touch the real network or the
+real database.

@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Hash from "@/components/app/Hash";
+import ReportAbuse from "@/components/app/ReportAbuse";
 import { ESCROW_CONTRACT, LATEST_BLOCK, acceptsRewards, balance, funded, paidOut, reportsFor, withdrawn } from "@/lib/sample-data";
 import { findProgramme } from "@/lib/programmes";
 import { CHAIN_LIVE, ESCROW_ADDRESS, REPORTS_LIVE, addressUrl, txUrl } from "@/lib/config";
 import { bot, signed } from "@/lib/format";
-import { blockedReason, pillClass, programmeState } from "@/lib/status";
+import { blockedReason, pillClass, programmeName, programmeState } from "@/lib/status";
 import s from "./detail.module.css";
 
 type Params = { programId: string };
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
   const p = await findProgramme((await params).programId);
-  return { title: p ? `${p.project} ${p.title} · Sehat` : "Programme · Sehat" };
+  return { title: p ? `${programmeName(p)} · Sehat` : "Programme · Sehat" };
 }
 
 export default async function ProgrammeDetail({ params }: { params: Promise<Params> }) {
@@ -40,7 +41,7 @@ export default async function ProgrammeDetail({ params }: { params: Promise<Para
       <div className="title-row">
         <div>
           <h1>
-            {p.project} {p.title}
+            {programmeName(p)}
           </h1>
           <p className="subline">
             <span className={pillClass(state.tone)} style={{ marginRight: 8 }}>
@@ -276,6 +277,11 @@ export default async function ProgrammeDetail({ params }: { params: Promise<Para
                 </>
               )}
             </dl>
+            {REPORTS_LIVE && p.onChain && (
+              <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--rule)", display: "grid" }}>
+                <ReportAbuse programmeId={String(p.onChain.programmeId)} project={p.project} />
+              </div>
+            )}
           </section>
         </aside>
       </div>

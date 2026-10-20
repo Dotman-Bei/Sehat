@@ -126,8 +126,19 @@ async function detail(r: Row, role: Role) {
   const messages = db()
     .prepare("SELECT author, role, team_only, body, created_at FROM messages WHERE report_id = ? ORDER BY id")
     .all(r.id) as { author: string; role: string; team_only: number; body: string; created_at: number }[];
-  const attachments = db().prepare("SELECT id, name, mime, size, created_at FROM attachments WHERE report_id = ? ORDER BY created_at").all(r.id);
-  const history = db().prepare("SELECT status, actor, reason, at FROM report_history WHERE report_id = ? ORDER BY id").all(r.id);
+  const attachments = db().prepare("SELECT id, name, mime, size, created_at FROM attachments WHERE report_id = ? ORDER BY created_at").all(r.id) as {
+    id: string;
+    name: string;
+    mime: string;
+    size: number;
+    created_at: number;
+  }[];
+  const history = db().prepare("SELECT status, actor, reason, at FROM report_history WHERE report_id = ? ORDER BY id").all(r.id) as {
+    status: string;
+    actor: string;
+    reason: string | null;
+    at: number;
+  }[];
   return {
     ...summary(r),
     role,

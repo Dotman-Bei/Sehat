@@ -19,16 +19,20 @@ const TABS = [
   { id: "closed", label: "Closed without reward", test: (r: Report) => CLOSED_WITHOUT_REWARD.includes(r.status) },
 ] as const;
 
-const project = (r: Report) => getProgramme(r.programmeId)?.project ?? r.programmeId;
+export type LiveReports = { reports: Report[]; keys: Record<string, string>; names: Record<string, string> };
 
-export default function ResearcherDashboard() {
+export default function ResearcherDashboard({ live }: { live?: LiveReports }) {
+  const project = (r: Report) => (live ? live.names[r.programmeId] ?? `Programme ${r.programmeId}` : getProgramme(r.programmeId)?.project ?? r.programmeId);
+  const nameOf = (id: string) => (live ? live.names[id] ?? `Programme ${id}` : getProgramme(id)?.project);
+  // Live links use the report's private id, never its reference.
+  const href = (r: Report) => `/reports/${live ? live.keys[r.id] : r.id}`;
   const { address } = useWallet();
   const router = useRouter();
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("all");
   const [prog, setProg] = useState("all");
   const [order, setOrder] = useState<"updated" | "submitted">("updated");
 
-  const reports = useMemo(() => (address ? researcherReports(address) : []), [address]);
+  const reports = useMemo(() => (live ? live.reports : address ? researcherReports(address) : []), [address, live]);
   const needInfo = reports.filter((r) => r.status === "needs_information");
   const agreed = reports.filter((r) => r.status === "reward_agreed");
   const paid = reports.filter((r) => r.status === "paid");
@@ -72,7 +76,7 @@ export default function ResearcherDashboard() {
     </div>
   );
 
-  if (!address) {
+  if (!live && !address) {
     return (
       <>
         {title}
@@ -114,7 +118,7 @@ export default function ResearcherDashboard() {
                   </p>
                   <p className="cell-main">{r.title}</p>
                   {q && <blockquote className={s.quote}>{q.body}</blockquote>}
-                  <Link href={`/reports/${r.id}`} className="btn btn-primary" style={{ justifySelf: "start" }}>
+                  <Link href={href(r)} className="btn btn-primary" style={{ justifySelf: "start" }}>
                     Reply to {q?.author ?? "the team"}
                   </Link>
                 </div>
@@ -135,7 +139,7 @@ export default function ResearcherDashboard() {
           <ul className={s.rewardList}>
             {[...agreed, ...paid].map((r) => (
               <li key={r.id}>
-                <Link href={`/reports/${r.id}`} className={s.rewardRow}>
+                <Link href={href(r)} className={s.rewardRow}>
                   <span>
                     <span className="cell-main">{project(r)}</span>
                     <span className="cell-sub">
@@ -170,7 +174,7 @@ export default function ResearcherDashboard() {
           <option value="all">All programmes</option>
           {programmes.map((id) => (
             <option key={id} value={id}>
-              {getProgramme(id)?.project}
+              {nameOf(id)}
             </option>
           ))}
         </select>
@@ -202,9 +206,9 @@ export default function ResearcherDashboard() {
               {shown.map((r) => {
                 const st = REPORT_STATUS[r.status];
                 return (
-                  <tr key={r.id} className="clickable" onClick={() => router.push(`/reports/${r.id}`)}>
+                  <tr key={r.id} className="clickable" onClick={() => router.push(href(r))}>
                     <td className={s.ident}>
-                      <Link href={`/reports/${r.id}`} className="cell-main" onClick={(e) => e.stopPropagation()}>
+                      <Link href={href(r)} className="cell-main" onClick={(e) => e.stopPropagation()}>
                         {r.title}
                       </Link>
                       <div className="cell-sub">
@@ -249,7 +253,7 @@ export default function ResearcherDashboard() {
               const st = REPORT_STATUS[r.status];
               return (
                 <li key={r.id}>
-                  <Link href={`/reports/${r.id}`} className={s.item}>
+                  <Link href={href(r)} className={s.item}>
                     <span className={s.line1}>
                       <span className="cell-main">{r.title}</span>
                       <span className="num">{r.reward ? `${bot(r.reward)} BOT` : <span className="dash">—</span>}</span>

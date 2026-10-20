@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useWallet } from "@/lib/wallet";
 import { REPORTS_LIVE } from "@/lib/config";
+import { postJson } from "@/lib/live-report";
 import { bot } from "@/lib/format";
 import s from "./submit.module.css";
 
@@ -61,6 +62,9 @@ export default function ReportForm({ programme: p }: Props) {
   const [fileError, setFileError] = useState<string | null>(null);
   const [tried, setTried] = useState(false);
   const [state, setState] = useState<"idle" | "sending" | "done">("idle");
+  const [created, setCreated] = useState<{ id: string; ref: string } | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [uploadNote, setUploadNote] = useState<string | null>(null);
 
   useEffect(() => {
     if (wallet.address && !payout) setPayout(wallet.address);
@@ -112,19 +116,53 @@ export default function ReportForm({ programme: p }: Props) {
       return;
     }
     setState("sending");
-    setTimeout(() => setState("done"), 900);
+    if (!REPORTS_LIVE) {
+      setTimeout(() => setState("done"), 900);
+      return;
+    }
+    void sendLive();
+  }
+
+  async function sendLive() {
+    setServerError(null);
+    try {
+      const r = await postJson<{ id: string; ref: string }>("/api/reports", {
+        programmeId: Number(p.id),
+        title,
+        category,
+        suggested: severity,
+        target,
+        impact,
+        steps,
+        payoutWallet: payout.trim(),
+        confirm,
+      });
+      setCreated(r);
+      const failed: string[] = [];
+      for (const file of files) {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch(`/api/reports/${r.id}/attachments`, { method: "POST", body: fd });
+        if (!res.ok) failed.push(`${file.name}: ${((await res.json().catch(() => ({}))) as { error?: string }).error ?? "upload failed"}`);
+      }
+      if (failed.length) setUploadNote(`The report was saved, but these files were not: ${failed.join("; ")}. Add them from the report page.`);
+      setState("done");
+    } catch (e) {
+      setServerError((e as Error).message);
+      setState("idle");
+    }
   }
 
   if (state === "done") {
     return (
       <section className={`panel ${s.done}`} aria-live="polite">
         <div className="panel-head">
-          <h2>Report SHT-0179 received</h2>
+          <h2>Report {created?.ref ?? "SHT-0179"} received</h2>
           <span className="pill">Submitted</span>
         </div>
         <dl className="kv" style={{ maxWidth: 520 }}>
           <dt>Reference</dt>
-          <dd className="num">SHT-0179</dd>
+          <dd className="num">{created?.ref ?? "SHT-0179"}</dd>
           <dt>Programme</dt>
           <dd>{p.project}</dd>
           <dt>Suggested severity</dt>
@@ -136,13 +174,20 @@ export default function ReportForm({ programme: p }: Props) {
           Only you and the {p.project} team can open this report. Their questions and decisions arrive on your dashboard.
           Nothing has been written to the chain.
         </p>
+        {uploadNote && <p className={s.err}>{uploadNote}</p>}
         {!REPORTS_LIVE && (
           <p className={s.previewNote}>Preview build: this report was not sent anywhere. In production it is stored privately with an access check on every read.</p>
         )}
         <div className={s.doneActions}>
-          <Link href="/researcher" className="btn btn-primary">
-            Go to your reports
-          </Link>
+          {created ? (
+            <Link href={`/reports/${created.id}`} className="btn btn-primary">
+              Open the private report
+            </Link>
+          ) : (
+            <Link href="/researcher" className="btn btn-primary">
+              Go to your reports
+            </Link>
+          )}
           <Link href={`/programs/${p.id}`} className="btn">
             Back to {p.project}
           </Link>
@@ -260,6 +305,7 @@ export default function ReportForm({ programme: p }: Props) {
           <button type="submit" className="btn btn-primary" disabled={state === "sending"}>
             {state === "sending" ? "Submitting…" : "Submit privately"}
           </button>
+          {serverError && <p className={s.err} style={{ flexBasis: "100%" }}>{serverError}</p>}
           <p className={s.still} aria-live="polite">
             {missing.length ? `Still needed: ${missing.map((m) => FIELD_NAMES[m]).join(", ")}.` : "Ready to submit."}
           </p>

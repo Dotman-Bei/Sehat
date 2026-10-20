@@ -34,9 +34,10 @@
     ".next-build/types/**/*.ts",
     ".next-fork/types/**/*.ts",
     ".next-live/types/**/*.ts",
+    ".next-test/types/**/*.ts",
     ".next/types/**/*.ts",
     "next-env.d.ts",
-    ".next-test/types/**/*.ts"
+    ".next-ui/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"
