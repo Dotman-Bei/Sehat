@@ -94,5 +94,24 @@ The node supports Cancun opcodes. Recheck all of this before each deployment.
 4. Put the address in `web/.env.local` as `NEXT_PUBLIC_SEHAT_ESCROW=0x…`, with
    `NEXT_PUBLIC_SEHAT_NETWORK=testnet`.
 
+## Deploying to BOT Chain mainnet
+
+Gas on BOT Chain has no base fee and a hard 20 gwei floor (lower prices are rejected as
+"gasPrice too low", probed 2026-10-25), so the only saving is gas used. The contract is compiled with
+the IR pipeline at 200 optimiser runs, which halves the bytecode:
+
+| Compiler setting | Deploy gas | Cost at 20 gwei |
+|---|---|---|
+| 10,000 runs, legacy pipeline (testnet build) | 2,126,430 | 0.0425 BOT |
+| 200 runs, legacy pipeline | 1,655,483 | 0.0331 BOT |
+| **200 runs, IR pipeline (current)** | **1,131,081** | **0.0226 BOT** |
+
+User actions cost 0.3–0.6% more gas under the IR build (at most about 950 gas per call); all 48 tests pass.
+Keep the gas buffer at 10%: the wallet needs about 0.025 BOT up front, and the unused part is refunded.
+
+```sh
+GUARDIAN=0x… forge script script/Deploy.s.sol --rpc-url botchain --broadcast --gas-estimate-multiplier 110   --verify --verifier blockscout --verifier-url https://scan.botchain.ai/api/
+```
+
 Mainnet (chain 677) only after an independent review and the PRD's security, legal and operational
 gates.
