@@ -2,17 +2,26 @@
   "network": "BOT Chain mainnet",
   "chainId": 677,
   "contract": "SehatEscrow",
-  "address": "0x78E8B05eDf62B068F5f276C54ADa87072d6C4efc",
-  "deployTx": "0x701a9f3332e2d11c1d3abcc7e19b53eaa1e1ba67bfb4bf5d0c6361a31605945e",
-  "block": 27946460,
-  "gasUsed": 1121017,
-  "costBOT": "0.02242034",
+  "address": "0xD438c5aF89538Dc8a00ABCFB688c42ebBAA0463D",
+  "deployTx": "0x2004e37354ea25c925a1158b2af2ea09430fbdff4c49903bdf639813bb20c973",
+  "block": 27949448,
+  "gasUsed": 1641290,
+  "costBOT": "0.0328258",
   "deployer": "0x1727eF2a5622B8559Af818A942dBFd59493e175E",
   "guardian": "0x1727eF2a5622B8559Af818A942dBFd59493e175E",
-  "compiler": "solc 0.8.28+commit.7893614a, optimizer 200 runs, viaIR, evm cancun",
-  "explorer": "https://scan.botchain.ai/address/0x78E8B05eDf62B068F5f276C54ADa87072d6C4efc",
+  "compiler": "solc 0.8.28+commit.7893614a, optimizer 200 runs, evm cancun",
+  "explorer": "https://scan.botchain.ai/address/0xD438c5aF89538Dc8a00ABCFB688c42ebBAA0463D",
   "explorerVerified": false,
-  "reproducible": "botchain-mainnet-standard-input.json compiles with solc 0.8.28 to the deployed creation bytecode byte for byte (checked 2026-10-25). The explorer's verifier rejects viaIR builds (Fail - Unable to verify) through both the Etherscan-style and the standard-input APIs.",
+  "reproducible": "botchain-mainnet-standard-input.json compiles with solc 0.8.28 to the deployed creation bytecode byte for byte. scan.botchain.ai answers 'Fail - Unable to verify' to the standard-input, flattened and Etherscan-style APIs for this build, while scan.bohr.life verified the same source and compiler on testnet. Raised as an explorer issue.",
   "deployedOn": "2026-10-25",
-  "notes": "Guardian is the deployer; move it to a multisig with transferGuardian. No independent review yet; keep programmes small until one is done."
+  "notes": "Canonical mainnet contract. Guardian is the deployer; move it to a multisig with transferGuardian. No independent review yet; keep programmes small until one is done.",
+  "superseded": [
+    {
+      "address": "0x78E8B05eDf62B068F5f276C54ADa87072d6C4efc",
+      "deployTx": "0x701a9f3332e2d11c1d3abcc7e19b53eaa1e1ba67bfb4bf5d0c6361a31605945e",
+      "block": 27946460,
+      "costBOT": "0.02242034",
+      "why": "viaIR build; deployed first, unused (no programmes, holds nothing). Replaced by a standard build in the hope of explorer verification."
+    }
+  ]
 }

@@ -6,10 +6,9 @@ solc_version = "0.8.28"
 # Bohr testnet (2026-10-20) and BOT Chain mainnet (2026-10-25) both run PUSH0, TSTORE and MCOPY.
 evm_version = "cancun"
 optimizer = true
-# Tuned for deployment cost on BOT Chain, where gas has a 20 gwei floor: the IR pipeline halves the
-# bytecode (1.13M deploy gas against 2.13M); see contracts/README.md for the measurements.
+# 200 runs on the standard pipeline: the cheapest build BOT Chain's explorer can verify (its verifier
+# rejects viaIR builds). Gas has a 20 gwei floor there; see contracts/README.md for the measurements.
 optimizer_runs = 200
-via_ir = true
 
 [fuzz]
 runs = 1000
