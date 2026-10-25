@@ -97,17 +97,18 @@ The node supports Cancun opcodes. Recheck all of this before each deployment.
 ## Deploying to BOT Chain mainnet
 
 Gas on BOT Chain has no base fee and a hard 20 gwei floor (lower prices are rejected as
-"gasPrice too low", probed 2026-10-25), so the only saving is gas used. The contract is compiled with
-the IR pipeline at 200 optimiser runs, which halves the bytecode:
+"gasPrice too low", probed 2026-10-25), so the only saving is gas used:
 
 | Compiler setting | Deploy gas | Cost at 20 gwei |
 |---|---|---|
-| 10,000 runs, legacy pipeline (testnet build) | 2,126,430 | 0.0425 BOT |
-| 200 runs, legacy pipeline | 1,655,483 | 0.0331 BOT |
-| **200 runs, IR pipeline (current)** | **1,131,081** | **0.0226 BOT** |
+| 10,000 runs (testnet build) | 2,126,430 | 0.0425 BOT |
+| **200 runs (current, mainnet build)** | **1,641,290** | **0.0328 BOT** |
+| 200 runs, IR pipeline | 1,121,017 | 0.0224 BOT |
 
-User actions cost 0.3–0.6% more gas under the IR build (at most about 950 gas per call); all 48 tests pass.
-Keep the gas buffer at 10%: the wallet needs about 0.025 BOT up front, and the unused part is refunded.
+The IR build is cheapest, but the mainnet deployment uses the standard build in the hope of explorer
+verification. Neither verifies on scan.botchain.ai yet, though the same source verified on
+scan.bohr.life. `deployments/botchain-mainnet-standard-input.json` reproduces the deployed bytecode
+byte for byte with solc 0.8.28. Keep the gas buffer at 10%.
 
 ```sh
 GUARDIAN=0x… forge script script/Deploy.s.sol --rpc-url botchain --broadcast --gas-estimate-multiplier 110   --verify --verifier blockscout --verifier-url https://scan.botchain.ai/api/
