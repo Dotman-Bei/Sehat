@@ -1,0 +1,110 @@
+{
+  "mode": "mainnet",
+  "escrow": "0xD438c5aF89538Dc8a00ABCFB688c42ebBAA0463D",
+  "programmes": {
+    "A": 1,
+    "B": 2
+  },
+  "rows": [
+    {
+      "step": 1,
+      "from": 1,
+      "what": "register test programme A + fund 0.0008",
+      "gasEstimate": 157537,
+      "gasLimit": 173290,
+      "gasUsed": 156334,
+      "valueBot": "0.0008",
+      "tx": "0x93899085c8c14165711bc96609838335382e11b55296ef279080d49f324d5480"
+    },
+    {
+      "step": 2,
+      "from": 2,
+      "what": "register test programme B + fund 0.0004",
+      "gasEstimate": 140369,
+      "gasLimit": 154405,
+      "gasUsed": 139234,
+      "valueBot": "0.0004",
+      "tx": "0x26488db0dda39c66fc6f88cca29b33d6d9021d9cc77e33ab19514d97c5e86b53"
+    },
+    {
+      "step": 3,
+      "from": 1,
+      "what": "fund A (#1) +0.0002",
+      "gasEstimate": 39079,
+      "gasLimit": 42986,
+      "gasUsed": 38712,
+      "valueBot": "0.0002",
+      "tx": "0xfff44f89b29a171f7e66bcc8bd166dc091b30a6b57f2daee8327c9377482f0fb"
+    },
+    {
+      "step": 4,
+      "from": 1,
+      "what": "release 0.0003 from A to W3",
+      "gasEstimate": 122295,
+      "gasLimit": 134524,
+      "gasUsed": 117017,
+      "valueBot": "0",
+      "tx": "0x03bf29d3deadc4c95745b5294c4c4097be1413917ae938aac451923e98fe4469"
+    },
+    {
+      "step": 5,
+      "from": 1,
+      "what": "release 0.0003 from A to W4",
+      "gasEstimate": 104991,
+      "gasLimit": 115490,
+      "gasUsed": 99917,
+      "valueBot": "0",
+      "tx": "0xe3b4293271e612ca17d05d7b2d5a3ae864609ecf96869ac468898db07b5c6fa7"
+    },
+    {
+      "step": 6,
+      "from": 2,
+      "what": "release 0.0003 from B (#2) to W5",
+      "gasEstimate": 122283,
+      "gasLimit": 134511,
+      "gasUsed": 117005,
+      "valueBot": "0",
+      "tx": "0xcbd88b319065fdf4d686ed62d21c2a0c696e09aeb38704bf0e18a7058a6f0c0d"
+    },
+    {
+      "step": 7,
+      "from": 2,
+      "what": "pause B",
+      "gasEstimate": 29399,
+      "gasLimit": 32338,
+      "gasUsed": 29051,
+      "valueBot": "0",
+      "tx": "0x0f8259d74b45e24575410bbc31f9791aeefa5053c2eb465fb86dfe5d93b5bef7"
+    },
+    {
+      "step": 8,
+      "from": 1,
+      "what": "offer A to W6",
+      "gasEstimate": 48889,
+      "gasLimit": 53777,
+      "gasUsed": 48502,
+      "valueBot": "0",
+      "tx": "0x491fb213de5f25a68944c4679118d6c190f67feb1832d37b36e1640a155699cb"
+    },
+    {
+      "step": 9,
+      "from": 6,
+      "what": "accept ownership of A",
+      "gasEstimate": 34372,
+      "gasLimit": 37809,
+      "gasUsed": 29097,
+      "valueBot": "0",
+      "tx": "0xfe3adafead4f3d31ca1e28e98a9a6d54f4fbaf7a0e6027c4756f3ce54754036c"
+    },
+    {
+      "step": 10,
+      "from": 6,
+      "what": "release 0.0003 from A to W7 (new owner)",
+      "gasEstimate": 104991,
+      "gasLimit": 115490,
+      "gasUsed": 99917,
+      "valueBot": "0",
+      "tx": "0x5a65c500e0e38a0e168f77ad35ada5ec7183554f3a31279f8bda46796a930b1e"
+    }
+  ]
+}
