@@ -94,7 +94,10 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-.canvas { padding: 32px var(--pad) 64px; min-width: 0; }
+.canvas { padding: 32px var(--pad) 64px; min-width: 0; flex: 1; }
+.app-foot { padding: 16px var(--pad); border-top: 1px solid var(--rule); color: var(--muted); font-size: 13px; }
+.app-foot p { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.app-foot strong { color: var(--text); font-weight: 600; }
 
 /* ---------- title row ---------- */
 .title-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px 24px; margin-bottom: 24px; flex-wrap: wrap; }

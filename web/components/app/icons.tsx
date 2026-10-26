@@ -1,13 +1,12 @@
+import { MARK_PATH } from "@/components/Logo";
 // One outline set, 1.5px stroke, drawn on a 20px grid.
 const base = { width: 20, height: 20, viewBox: "0 0 20 20", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
 /** Sehat's mark: a deposit box seen face-on, its brass plate and keyhole, in crimson. */
-export function Mark({ size = 28 }: { size?: number }) {
+export function Mark({ size = 32 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 28 28" aria-hidden>
-      <rect x="1" y="1" width="26" height="26" fill="#b11226" />
-      <rect x="6" y="11" width="16" height="6" fill="#efefef" />
-      <rect x="13" y="12.5" width="2" height="3" fill="#b11226" />
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
+      <path fill="#b11226" d={MARK_PATH} />
     </svg>
   );
 }

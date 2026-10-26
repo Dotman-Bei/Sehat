@@ -56,3 +56,7 @@ export const PREVIEW_DATA = !CHAIN_LIVE;
 
 export const txUrl = (hash: string) => `${ACTIVE_NETWORK.explorer}/tx/${hash}`;
 export const addressUrl = (address: string) => `${ACTIVE_NETWORK.explorer}/address/${address}`;
+
+/** BOT Chain's own site and explorer, credited in every footer. */
+export const BOTCHAIN_SITE = "https://www.botchain.ai";
+export const BOTCHAIN_EXPLORER = NETWORKS.mainnet.explorer;

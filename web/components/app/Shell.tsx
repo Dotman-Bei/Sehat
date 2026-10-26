@@ -10,6 +10,7 @@ import { readAllProgrammes } from "@/lib/chain";
 import { PREVIEW_IDENTITIES, sameAddress, useWallet } from "@/lib/wallet";
 import { ADMIN_WALLET, PROGRAMMES, getProgramme, getReport } from "@/lib/sample-data";
 import { short } from "@/lib/format";
+import BuiltOnBotChain from "@/components/BuiltOnBotChain";
 
 type Crumb = { label: string; href?: string };
 
@@ -123,6 +124,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           )
         )}
         <main className="canvas">{children}</main>
+        <footer className="app-foot">
+          <BuiltOnBotChain />
+        </footer>
       </div>
     </div>
   );

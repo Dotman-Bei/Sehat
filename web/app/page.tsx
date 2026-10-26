@@ -3,6 +3,8 @@ import Link from "next/link";
 import h from "./home.module.css";
 import Showcase from "@/components/home/Showcase";
 import Motion from "@/components/home/Motion";
+import BuiltOnBotChain from "@/components/BuiltOnBotChain";
+import { Logo } from "@/components/Logo";
 import {
   EscrowTile,
   FundingEvent,
@@ -124,8 +126,8 @@ export default function Home() {
       <Motion />
 
       <header className={h.sitebar} data-sitebar>
-        <Link href="/" className={h.sitebarMark}>
-          SEHAT
+        <Link href="/" className={h.sitebarMark} aria-label="Sehat home">
+          <Logo height={32} />
         </Link>
         <nav className={h.sitebarNav} aria-label="Main">
           <Link className="link" href="/programs">
@@ -478,6 +480,7 @@ export default function Home() {
             <p>Never send a vulnerability by email. Submit it to the programme, where only its team can read it.</p>
           </div>
         </div>
+        <BuiltOnBotChain className={h.builtOn} />
         <div className={h.footLast}>
           <p className={h.credits}>
             © 2026 Sehat. Pictures:{" "}

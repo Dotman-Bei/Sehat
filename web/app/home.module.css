@@ -8,7 +8,7 @@
   translate: 0 -100%; transition: translate var(--t-ui) var(--ease-out);
 }
 .sitebar[data-shown], .sitebar:focus-within { translate: 0 0; }
-.sitebarMark { font-weight: 700; font-size: 20px; letter-spacing: -0.035em; }
+.sitebarMark { display: block; color: var(--ink); }
 .sitebarNav { display: flex; gap: 24px; font-size: 15px; margin-left: auto; }
 @media (max-width: 640px) { .sitebarNav { display: none; } .sitebar > a:last-child { margin-left: auto; } }
 
@@ -304,8 +304,13 @@
 .footCol ul { display: grid; gap: 8px; }
 .footHead { font-weight: 600; color: var(--muted); }
 .footContact { grid-column: 9 / 13; display: grid; gap: 12px; align-content: start; font-family: var(--font-text); font-size: var(--step-body); line-height: 1.5; }
+.builtOn {
+  margin-top: 64px; padding-top: 20px; border-top: 1px solid #2a2a2a;
+  display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: var(--step-body);
+}
+.builtOn strong { font-weight: 700; }
 .footLast {
-  margin-top: 64px; display: flex; justify-content: space-between; align-items: flex-end; gap: 24px;
+  margin-top: 32px; display: flex; justify-content: space-between; align-items: flex-end; gap: 24px;
 }
 .credits { font-size: 14px; color: var(--muted); max-width: 90ch; line-height: 1.5; }
 .credits a { color: var(--ink); text-decoration-color: #555; }
