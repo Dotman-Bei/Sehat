@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# End-to-end test of the private reports API: an anvil fork of Bohr, a dev server in full live mode
+# End-to-end test of the private reports API: an anvil fork of BOT Chain mainnet, a dev server in full live mode
 # with a throwaway database, and real wallet signatures. Nothing touches the real network or data.
 set -e
 cd "$(dirname "$0")/.."
@@ -16,9 +16,8 @@ APP_PORT=3400
 RUN=".data/test-$(date +%s)"
 mkdir -p "$RUN"
 
-export NEXT_PUBLIC_SEHAT_NETWORK=testnet
-export NEXT_PUBLIC_SEHAT_ESCROW=0xbC555De32fb45a8FF3297cbbc1a6F50F7674Bb54
-export NEXT_PUBLIC_SEHAT_ESCROW_BLOCK=27529541
+export NEXT_PUBLIC_SEHAT_ESCROW=0xD438c5aF89538Dc8a00ABCFB688c42ebBAA0463D
+export NEXT_PUBLIC_SEHAT_ESCROW_BLOCK=27949448
 export NEXT_PUBLIC_SEHAT_REPORTS=live
 export NEXT_PUBLIC_SEHAT_RPC=http://127.0.0.1:$FORK_PORT
 export SEHAT_DB_FILE="$RUN/sehat.db"
@@ -31,7 +30,7 @@ export SERVER_LOG="$RUN/server.log"
 
 for p in $APP_PORT $FORK_PORT; do port_busy $p && { echo "port $p is in use; stop it first"; exit 1; }; done
 
-anvil --silent --port $FORK_PORT --fork-url https://rpc.bohr.life &
+anvil --silent --port $FORK_PORT --fork-url https://rpc.botchain.ai &
 ANVIL=$!
 NEXT_DIST_DIR=.next-test npx next dev -p $APP_PORT > "$SERVER_LOG" 2>&1 &
 NEXT=$!

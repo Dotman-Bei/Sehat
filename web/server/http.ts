@@ -57,16 +57,16 @@ export async function readJson<T>(req: Request, maxBytes = 64 * 1024): Promise<T
 }
 
 /** Fixed-window rate limit stored in the database. */
-export function rateLimit(key: string, limit: number, windowSeconds: number) {
-  const d = db();
+export async function rateLimit(key: string, limit: number, windowSeconds: number) {
+  const d = await db();
   const t = now();
-  const row = d.prepare("SELECT window_start, count FROM rate WHERE key = ?").get(key) as { window_start: number; count: number } | undefined;
+  const row = (await d.get("SELECT window_start, count FROM rate WHERE key = ?", key)) as { window_start: number; count: number } | undefined;
   if (!row || t - row.window_start >= windowSeconds) {
-    d.prepare("INSERT INTO rate(key, window_start, count) VALUES (?, ?, 1) ON CONFLICT(key) DO UPDATE SET window_start = excluded.window_start, count = 1").run(key, t);
+    (await d.run("INSERT INTO rate(key, window_start, count) VALUES (?, ?, 1) ON CONFLICT(key) DO UPDATE SET window_start = excluded.window_start, count = 1", key, t));
     return;
   }
   if (row.count >= limit) fail(429, "Too many requests. Try again later.");
-  d.prepare("UPDATE rate SET count = count + 1 WHERE key = ?").run(key);
+  (await d.run("UPDATE rate SET count = count + 1 WHERE key = ?", key));
 }
 
 export const clientIp = (req: Request) => req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "local";

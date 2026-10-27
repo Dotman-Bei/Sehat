@@ -1,5 +1,5 @@
 // Browser end-to-end test of the full live flow, driven through the real UI.
-// Run through scripts/test-ui.sh (anvil fork of Bohr + dev server with a throwaway database).
+// Run through scripts/test-ui.sh (anvil fork of BOT Chain mainnet + dev server with a throwaway database).
 // The injected wallet forwards to anvil, whose dev accounts can sign messages and send transactions.
 import { createHash } from "node:crypto";
 import { Browser, sleep } from "../../.claude/skills/design-taste-frontend/scripts/lib/cdp.mjs";

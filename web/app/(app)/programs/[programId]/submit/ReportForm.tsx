@@ -34,7 +34,7 @@ const CATEGORIES = [
 const NOT_LISTED = "__not_listed";
 const ALLOWED = ["application/pdf", "image/png", "image/jpeg", "text/plain"];
 const MAX_FILES = 5;
-const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_BYTES = 4 * 1024 * 1024;
 
 type Field = "title" | "category" | "severity" | "target" | "impact" | "steps" | "wallet" | "confirm";
 const FIELD_NAMES: Record<Field, string> = {
@@ -96,7 +96,7 @@ export default function ReportForm({ programme: p }: Props) {
         continue;
       }
       if (f.size > MAX_BYTES) {
-        setFileError(`${f.name} is over 10 MB.`);
+        setFileError(`${f.name} is over 4 MB.`);
         continue;
       }
       if (next.length >= MAX_FILES) {
@@ -257,7 +257,7 @@ export default function ReportForm({ programme: p }: Props) {
 
         <div className={s.field}>
           <label htmlFor="f-steps">Reproduction steps</label>
-          <textarea id="f-steps" className="textarea" rows={6} value={steps} onChange={(e) => setSteps(e.target.value)} aria-invalid={!!show("steps")} aria-describedby="e-steps" placeholder="Steps the team can follow on a fork or testnet without touching user funds" />
+          <textarea id="f-steps" className="textarea" rows={6} value={steps} onChange={(e) => setSteps(e.target.value)} aria-invalid={!!show("steps")} aria-describedby="e-steps" placeholder="Steps the team can follow on a local fork without touching user funds" />
           <Err id="e-steps" msg={show("steps")} />
         </div>
 
@@ -282,7 +282,7 @@ export default function ReportForm({ programme: p }: Props) {
               ))}
             </ul>
           )}
-          <p className={s.help}>PDF, PNG, JPEG or plain text, up to 10 MB each and 5 files. Stored privately; Sehat never opens or runs them.</p>
+          <p className={s.help}>PDF, PNG, JPEG or plain text, up to 4 MB each and 5 files. Stored privately; Sehat never opens or runs them.</p>
           {fileError && <p className={s.err}>{fileError}</p>}
         </div>
 

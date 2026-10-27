@@ -16,7 +16,7 @@ import {
 } from "@/components/home/Fragments";
 import { bot, short } from "@/lib/format";
 import { PROGRAMMES, balance, getProgramme, getReport, LATEST_BLOCK } from "@/lib/sample-data";
-import { ACTIVE_NETWORK, NETWORKS } from "@/lib/config";
+import { ACTIVE_NETWORK } from "@/lib/config";
 
 const P = (id: string) => getProgramme(id)!;
 const R = (id: string) => getReport(id)!;
@@ -111,7 +111,7 @@ const FAQ: [string, string][] = [
   ],
   [
     "Which network and token?",
-    `BOT Chain mainnet (chain ${NETWORKS.mainnet.chainId}) and Bohr testnet (chain ${NETWORKS.testnet.chainId}), paid in native BOT. Sehat has no token of its own.`,
+    `${ACTIVE_NETWORK.name} (chain ${ACTIVE_NETWORK.chainId}), paid in native BOT. Sehat has no token of its own.`,
   ],
 ];
 
@@ -469,8 +469,7 @@ export default function Home() {
           <FootCol
             title="Network"
             links={[
-              [`BOT Chain mainnet · ${NETWORKS.mainnet.chainId}`, NETWORKS.mainnet.explorer],
-              [`Bohr testnet · ${NETWORKS.testnet.chainId}`, NETWORKS.testnet.explorer],
+              [`${ACTIVE_NETWORK.name} · ${ACTIVE_NETWORK.chainId}`, ACTIVE_NETWORK.explorer],
               ["BOT Chain developer docs", "https://dev-docs.botchain.ai/docs/Developers/quick-guide/"],
             ]}
           />

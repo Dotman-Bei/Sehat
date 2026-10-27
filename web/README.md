@@ -19,13 +19,14 @@ while reports are sample data.
 Copy `.env.example` to `.env.local`.
 
 ```sh
-NEXT_PUBLIC_SEHAT_NETWORK=testnet
-NEXT_PUBLIC_SEHAT_ESCROW=0xbC555De32fb45a8FF3297cbbc1a6F50F7674Bb54   # Bohr testnet deployment
-NEXT_PUBLIC_SEHAT_ESCROW_BLOCK=27529541                 # deploy block; event scans start here
+NEXT_PUBLIC_SEHAT_ESCROW=0xD438c5aF89538Dc8a00ABCFB688c42ebBAA0463D   # BOT Chain mainnet deployment
+NEXT_PUBLIC_SEHAT_ESCROW_BLOCK=27949448                 # deploy block; event scans start here
 NEXT_PUBLIC_SEHAT_REPORTS=live                          # turn on the reports service
 SEHAT_SESSION_SECRET=<32+ random characters>            # required in production
 SEHAT_ADMINS=0xabc…,0xdef…                              # lowercase admin wallets (moderation only)
-# SEHAT_DB_FILE=.data/sehat.db                          # default
+TURSO_DATABASE_URL=libsql://<db>-<org>.turso.io           # hosted report database (required on Vercel)
+TURSO_AUTH_TOKEN=<token>
+# SEHAT_DB_FILE=.data/sehat.db                          # local default when TURSO_DATABASE_URL is unset
 # NEXT_PUBLIC_SEHAT_RPC=http://127.0.0.1:8545           # RPC override (local fork)
 ```
 
@@ -59,15 +60,17 @@ report need a reason, only the owner agrees rewards (within the tier range and t
 paid or agreed reports cannot be re-triaged. Writes must come from this site (origin check). There are
 rate limits on sign-in, reports, messages, uploads and abuse reports.
 
-**Attachments.** At most 5 per report and 10 MB each; PDF, PNG, JPEG or UTF-8 text, decided from the
-bytes. Stored under `.data/attachments/` outside the web root, never executed, and served only as
+**Attachments.** At most 5 per report and 4 MB each (Vercel caps request bodies at 4.5 MB); PDF, PNG, JPEG or UTF-8 text, decided from the
+bytes. Stored in the report database, never written to disk or executed, and served only as
 downloads behind the report's access check, with `nosniff` and a sandboxing CSP.
 
 **Logs.** The server logs the route and the error class only, never request bodies or report text.
 The end-to-end test checks this.
 
-**Storage and retention.** SQLite in `.data/sehat.db` (git-ignored). Back it up and encrypt the disk at
-rest. Swap `server/db.ts` for Postgres to run more than one server. Reports, threads, history and
+**Storage and retention.** SQLite through libSQL: a hosted Turso database in production
+(`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`), a file in `.data/sehat.db` (git-ignored) locally. Attachments
+are stored in the same database, so Vercel's read-only file system is never used. Turn on Turso's backups
+and keep the auth token in Vercel's encrypted environment variables only. Reports, threads, history and
 attachments are kept for the life of the programme plus its disclosure window. Deleting a report's
 contents must keep its digest, so a paid reference stays traceable. Retention periods and deletion
 requests need a written policy before mainnet. Reports are not end-to-end encrypted.
@@ -83,7 +86,7 @@ close spam, not move funds.
 npm run dev
 npm run build
 npm run lint
-npm run test:chain     # live reads from Bohr + every write path on an anvil fork
+npm run test:chain     # live reads from mainnet + every write path on an anvil fork of it
 npm run test:reports   # reports API end to end: auth, access, triage, attachments, verified payout, moderation
 npm run test:ui        # the whole flow clicked through the browser, on a fork with a throwaway database
 ```

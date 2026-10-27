@@ -1,18 +1,16 @@
 import "server-only";
-// Private report store. SQLite through node:sqlite (Node 22+), one file under .data/ (git-ignored).
+// Private report store, in SQLite. In production a hosted libSQL database (Turso) over HTTP, set by
+// TURSO_DATABASE_URL and TURSO_AUTH_TOKEN; locally a file under .data/ (git-ignored) through node:sqlite.
 // Everything here is confidential: never log row contents, never return rows without an access check.
-// Swap this module for Postgres in production; the rest of the server talks to it through server/reports.ts.
 
 import { mkdirSync } from "node:fs";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
+import { createClient, type Client, type Transaction } from "@libsql/client/web";
 
 const FILE = process.env.SEHAT_DB_FILE || path.join(process.cwd(), ".data", "sehat.db");
 
 const SCHEMA = `
-PRAGMA journal_mode = WAL;
-PRAGMA foreign_keys = ON;
-
 CREATE TABLE IF NOT EXISTS reports (
   id            TEXT PRIMARY KEY,          -- random, used in private links
   ref           TEXT NOT NULL UNIQUE,      -- SHT-0001, for people
@@ -65,7 +63,7 @@ CREATE TABLE IF NOT EXISTS attachments (
   name        TEXT NOT NULL,
   mime        TEXT NOT NULL,
   size        INTEGER NOT NULL,
-  file        TEXT NOT NULL,               -- path under .data/attachments
+  data        BLOB NOT NULL,               -- the file itself; never served without the report's access check
   uploaded_by TEXT NOT NULL,
   created_at  INTEGER NOT NULL
 );
@@ -120,30 +118,91 @@ CREATE TABLE IF NOT EXISTS rate (
 );
 `;
 
-const g = globalThis as unknown as { __sehatDb?: DatabaseSync };
+type Value = string | number | bigint | null | Uint8Array;
 
-export function db(): DatabaseSync {
-  if (!g.__sehatDb) {
-    if (FILE !== ":memory:") mkdirSync(path.dirname(FILE), { recursive: true });
-    const d = new DatabaseSync(FILE);
-    d.exec(SCHEMA);
-    g.__sehatDb = d;
-  }
+/** The queries the rest of the server uses, on the database or inside a transaction. */
+export type Q = {
+  get<T>(sql: string, ...args: Value[]): Promise<T | undefined>;
+  all<T>(sql: string, ...args: Value[]): Promise<T[]>;
+  run(sql: string, ...args: Value[]): Promise<void>;
+};
+type Store = { q: Q; tx<T>(fn: (q: Q) => Promise<T>): Promise<T> };
+
+/** Hosted: libSQL over HTTP, with interactive write transactions. */
+async function remote(url: string): Promise<Store> {
+  const c = createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN });
+  await c.executeMultiple(SCHEMA);
+  const on = (x: Client | Transaction): Q => ({
+    get: async <T,>(sql: string, ...args: Value[]) => (await x.execute({ sql, args })).rows[0] as unknown as T | undefined,
+    all: async <T,>(sql: string, ...args: Value[]) => (await x.execute({ sql, args })).rows as unknown as T[],
+    run: async (sql: string, ...args: Value[]) => void (await x.execute({ sql, args })),
+  });
+  return {
+    q: on(c),
+    async tx(fn) {
+      const t = await c.transaction("write");
+      try {
+        const out = await fn(on(t));
+        await t.commit();
+        return out;
+      } finally {
+        t.close();
+      }
+    },
+  };
+}
+
+/** Local: one SQLite file. Transactions run one at a time so no other request's statements land inside one. */
+async function local(file: string): Promise<Store> {
+  const { DatabaseSync } = await import("node:sqlite");
+  if (file !== ":memory:") mkdirSync(path.dirname(file), { recursive: true });
+  const d: DatabaseSync = new DatabaseSync(file);
+  d.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
+  d.exec(SCHEMA);
+  const q: Q = {
+    get: async <T,>(sql: string, ...args: Value[]) => d.prepare(sql).get(...args) as T | undefined,
+    all: async <T,>(sql: string, ...args: Value[]) => d.prepare(sql).all(...args) as T[],
+    run: async (sql: string, ...args: Value[]) => void d.prepare(sql).run(...args),
+  };
+  let queue: Promise<unknown> = Promise.resolve();
+  return {
+    q,
+    tx(fn) {
+      const run = queue.then(async () => {
+        d.exec("BEGIN IMMEDIATE");
+        try {
+          const out = await fn(q);
+          d.exec("COMMIT");
+          return out;
+        } catch (e) {
+          d.exec("ROLLBACK");
+          throw e;
+        }
+      });
+      queue = run.catch(() => {});
+      return run;
+    },
+  };
+}
+
+const g = globalThis as unknown as { __sehatDb?: Promise<Store> };
+
+function store(): Promise<Store> {
+  g.__sehatDb ??= (process.env.TURSO_DATABASE_URL ? remote(process.env.TURSO_DATABASE_URL) : local(FILE)).catch((e) => {
+    g.__sehatDb = undefined;
+    throw e;
+  });
   return g.__sehatDb;
+}
+
+/** The database, schema ensured. */
+export async function db(): Promise<Q> {
+  return (await store()).q;
 }
 
 export const now = () => Math.floor(Date.now() / 1000);
 
-/** Runs fn in a transaction. */
-export function tx<T>(fn: () => T): T {
-  const d = db();
-  d.exec("BEGIN IMMEDIATE");
-  try {
-    const out = fn();
-    d.exec("COMMIT");
-    return out;
-  } catch (e) {
-    d.exec("ROLLBACK");
-    throw e;
-  }
+/** Runs fn in a write transaction. */
+export async function tx<T>(fn: (q: Q) => Promise<T>): Promise<T> {
+  return (await store()).tx(fn);
 }

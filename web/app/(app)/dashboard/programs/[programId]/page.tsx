@@ -31,7 +31,7 @@ export default async function ManagePage({ params }: { params: Promise<Params> }
     signedIn: !!team,
     reports: summaries.map(summaryToReport),
     keys: Object.fromEntries(summaries.map((r) => [r.ref, r.id])),
-    triagers: team ? listTriagers(id) : [],
+    triagers: team ? await listTriagers(id) : [],
   };
   // Keyed on the session and queue so client state is rebuilt after sign-in or a change.
   return <Manage key={`${who}-${live.signedIn}-${live.reports.length}-${live.triagers.length}`} programme={p} live={live} />;

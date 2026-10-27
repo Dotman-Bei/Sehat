@@ -4,34 +4,21 @@
 import { defineChain } from "viem";
 
 export type Network = {
-  key: "mainnet" | "testnet";
   name: string;
   chainId: number;
   rpc: string;
   explorer: string;
 };
 
-export const NETWORKS: Record<Network["key"], Network> = {
-  mainnet: {
-    key: "mainnet",
-    name: "BOT Chain mainnet",
-    chainId: 677,
-    rpc: "https://rpc.botchain.ai",
-    explorer: "https://scan.botchain.ai",
-  },
-  testnet: {
-    key: "testnet",
-    name: "Bohr testnet",
-    chainId: 968,
-    rpc: "https://rpc.bohr.life",
-    explorer: "https://scan.bohr.life",
-  },
+const MAINNET: Network = {
+  name: "BOT Chain mainnet",
+  chainId: 677,
+  rpc: "https://rpc.botchain.ai",
+  explorer: "https://scan.botchain.ai",
 };
 
-const base = NETWORKS[(process.env.NEXT_PUBLIC_SEHAT_NETWORK as Network["key"]) ?? "testnet"] ?? NETWORKS.testnet;
-
 /** The active network. NEXT_PUBLIC_SEHAT_RPC overrides the RPC (for a local fork in tests). */
-export const ACTIVE_NETWORK: Network = { ...base, rpc: process.env.NEXT_PUBLIC_SEHAT_RPC || base.rpc };
+export const ACTIVE_NETWORK: Network = { ...MAINNET, rpc: process.env.NEXT_PUBLIC_SEHAT_RPC || MAINNET.rpc };
 
 export const VIEM_CHAIN = defineChain({
   id: ACTIVE_NETWORK.chainId,
@@ -59,4 +46,4 @@ export const addressUrl = (address: string) => `${ACTIVE_NETWORK.explorer}/addre
 
 /** BOT Chain's own site and explorer, credited in every footer. */
 export const BOTCHAIN_SITE = "https://www.botchain.ai";
-export const BOTCHAIN_EXPLORER = NETWORKS.mainnet.explorer;
+export const BOTCHAIN_EXPLORER = MAINNET.explorer;

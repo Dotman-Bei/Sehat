@@ -6,5 +6,5 @@ export const dynamic = "force-dynamic";
 
 export const POST = handle(async (req) => {
   requireLive();
-  return json({ nonce: issueNonce(req) });
+  return json({ nonce: await issueNonce(req) });
 });

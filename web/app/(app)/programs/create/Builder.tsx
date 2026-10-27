@@ -22,7 +22,7 @@ type Step = (typeof STEPS)[number];
 
 const KINDS = ["Smart contract", "Off-chain service", "Web API", "Browser extension", "Library", "Web app"];
 const DEFAULT_RULES =
-  "Test only against the targets in scope, on Bohr testnet or a local fork.\nNo denial-of-service, destructive tests, data exfiltration, privacy violations or social engineering.\nIf you reach personal data or keys by accident, stop, keep no copy, and say so in the report.\nDo not disclose publicly until both sides agree.";
+  "Test only against the targets in scope, on a local fork.\nNo denial-of-service, destructive tests, data exfiltration, privacy violations or social engineering.\nIf you reach personal data or keys by accident, stop, keep no copy, and say so in the report.\nDo not disclose publicly until both sides agree.";
 
 const num = (v: string) => Number(v.replace(/[,\s]/g, ""));
 

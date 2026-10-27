@@ -2,7 +2,6 @@ import "server-only";
 // The private reports service: every read and write goes through an access check here.
 
 import { randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { decodeEventLog, encodeAbiParameters, keccak256, parseEther, type Hex } from "viem";
 import { ESCROW_ABI } from "@/lib/escrow-abi";
@@ -11,7 +10,7 @@ import { ACTIVE_NETWORK, ESCROW_ADDRESS } from "@/lib/config";
 import { SEVERITIES, type Severity } from "@/lib/sample-data";
 import { blockedReason } from "@/lib/status";
 import { findProgramme } from "@/lib/programmes";
-import { db, now, tx } from "./db";
+import { db, now, tx, type Q } from "./db";
 import { fail, rateLimit } from "./http";
 
 const CHAIN = ACTIVE_NETWORK.chainId;
@@ -78,15 +77,15 @@ export async function programmeOwner(programmeId: number): Promise<string | null
   return p.owner.toLowerCase();
 }
 
-export const isTriager = (programmeId: number, wallet: string) =>
-  !!db().prepare("SELECT 1 FROM triagers WHERE chain_id = ? AND programme_id = ? AND wallet = ?").get(CHAIN, programmeId, wallet);
+export const isTriager = async (programmeId: number, wallet: string) =>
+  !!(await (await db()).get("SELECT 1 FROM triagers WHERE chain_id = ? AND programme_id = ? AND wallet = ?", CHAIN, programmeId, wallet));
 
 export const isAdmin = (wallet: string | null) =>
   !!wallet && (process.env.SEHAT_ADMINS ?? "").toLowerCase().split(",").map((s) => s.trim()).includes(wallet);
 
 export async function teamRole(programmeId: number, wallet: string): Promise<"owner" | "triager" | null> {
   if ((await programmeOwner(programmeId)) === wallet) return "owner";
-  return isTriager(programmeId, wallet) ? "triager" : null;
+  return (await isTriager(programmeId, wallet)) ? "triager" : null;
 }
 
 async function roleFor(r: Row, wallet: string): Promise<Role | null> {
@@ -97,7 +96,7 @@ async function roleFor(r: Row, wallet: string): Promise<Role | null> {
 
 /** Loads a report the wallet may see. Others get the same 404 as a missing report, so existence never leaks. */
 async function load(id: string, wallet: string): Promise<{ r: Row; role: Role }> {
-  const r = db().prepare("SELECT * FROM reports WHERE id = ? AND chain_id = ?").get(id, CHAIN) as Row | undefined;
+  const r = await (await db()).get("SELECT * FROM reports WHERE id = ? AND chain_id = ?", id, CHAIN) as Row | undefined;
   const role = r ? await roleFor(r, wallet) : null;
   if (!r || !role) return fail(404, "Report not found.");
   return { r: r!, role: role! };
@@ -123,17 +122,15 @@ const summary = (r: Row) => ({
 
 async function detail(r: Row, role: Role) {
   const team = role !== "researcher";
-  const messages = db()
-    .prepare("SELECT author, role, team_only, body, created_at FROM messages WHERE report_id = ? ORDER BY id")
-    .all(r.id) as { author: string; role: string; team_only: number; body: string; created_at: number }[];
-  const attachments = db().prepare("SELECT id, name, mime, size, created_at FROM attachments WHERE report_id = ? ORDER BY created_at").all(r.id) as {
+  const messages = await (await db()).all("SELECT author, role, team_only, body, created_at FROM messages WHERE report_id = ? ORDER BY id", r.id) as { author: string; role: string; team_only: number; body: string; created_at: number }[];
+  const attachments = await (await db()).all("SELECT id, name, mime, size, created_at FROM attachments WHERE report_id = ? ORDER BY created_at", r.id) as {
     id: string;
     name: string;
     mime: string;
     size: number;
     created_at: number;
   }[];
-  const history = db().prepare("SELECT status, actor, reason, at FROM report_history WHERE report_id = ? ORDER BY id").all(r.id) as {
+  const history = await (await db()).all("SELECT status, actor, reason, at FROM report_history WHERE report_id = ? ORDER BY id", r.id) as {
     status: string;
     actor: string;
     reason: string | null;
@@ -179,12 +176,12 @@ const text = (v: unknown, name: string, min: number, max: number) => {
 };
 
 export async function createReport(wallet: string, input: CreateInput) {
-  rateLimit(`report:${wallet}`, 5, 3600);
+  await rateLimit(`report:${wallet}`, 5, 3600);
   const programmeId = Number(input.programmeId);
   if (!Number.isInteger(programmeId) || programmeId < 1) fail(400, "Unknown programme.");
   const p = await findProgramme(String(programmeId));
   if (!p) fail(404, "Unknown programme.");
-  const blocked = blockedReason(p!) ?? (isHidden(programmeId) ? "This programme is hidden from the directory by moderation." : null);
+  const blocked = blockedReason(p!) ?? ((await isHidden(programmeId)) ? "This programme is hidden from the directory by moderation." : null);
   if (blocked) fail(409, blocked);
 
   const title = text(input.title, "Title", 8, 120);
@@ -197,34 +194,31 @@ export async function createReport(wallet: string, input: CreateInput) {
   if (!ADDRESS.test(input.payoutWallet ?? "")) fail(400, "The payout wallet is not a valid address.");
   if (input.confirm !== true) fail(400, "Confirm that you followed the rules of engagement.");
 
-  return tx(() => {
-    const count = (db().prepare("SELECT COUNT(*) AS n FROM reports").get() as { n: number }).n;
+  return tx(async (q) => {
+    const count = (await q.get("SELECT COUNT(*) AS n FROM reports") as { n: number }).n;
     const ref = `SHT-${String(count + 1).padStart(4, "0")}`;
     const id = `r${randomBytes(12).toString("hex")}`;
     const salt = `0x${randomBytes(32).toString("hex")}` as Hex;
     const digest = keccak256(encodeAbiParameters([{ type: "string" }, { type: "bytes32" }], [ref, salt]));
     const t = now();
-    db()
-      .prepare(
+    await q.run(
         `INSERT INTO reports(id, ref, chain_id, programme_id, reporter, title, category, target, suggested, status, impact, steps, payout_wallet, salt, digest, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'submitted', ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(id, ref, CHAIN, programmeId, wallet, title, input.category, input.target === NOT_LISTED ? "Not listed in scope" : input.target, input.suggested, impact, steps, input.payoutWallet.toLowerCase(), salt, digest, t, t);
-    db().prepare("INSERT INTO report_history(report_id, status, actor, at) VALUES (?, 'submitted', ?, ?)").run(id, wallet, t);
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'submitted', ?, ?, ?, ?, ?, ?, ?)`, id, ref, CHAIN, programmeId, wallet, title, input.category, input.target === NOT_LISTED ? "Not listed in scope" : input.target, input.suggested, impact, steps, input.payoutWallet.toLowerCase(), salt, digest, t, t);
+    await q.run("INSERT INTO report_history(report_id, status, actor, at) VALUES (?, 'submitted', ?, ?)", id, wallet, t);
     return { id, ref };
   });
 }
 
 // ---------------------------------------------------------------- read
 
-export function listMine(wallet: string) {
-  const rows = db().prepare("SELECT * FROM reports WHERE reporter = ? AND chain_id = ? ORDER BY updated_at DESC").all(wallet, CHAIN) as Row[];
+export async function listMine(wallet: string) {
+  const rows = await (await db()).all("SELECT * FROM reports WHERE reporter = ? AND chain_id = ? ORDER BY updated_at DESC", wallet, CHAIN) as Row[];
   return rows.map(summary);
 }
 
 export async function listForProgramme(programmeId: number, wallet: string) {
   if (!(await teamRole(programmeId, wallet))) fail(403, "Only the programme owner and its triagers can see its reports.");
-  const rows = db().prepare("SELECT * FROM reports WHERE chain_id = ? AND programme_id = ? ORDER BY created_at").all(CHAIN, programmeId) as Row[];
+  const rows = await (await db()).all("SELECT * FROM reports WHERE chain_id = ? AND programme_id = ? ORDER BY created_at", CHAIN, programmeId) as Row[];
   return rows.map((r) => ({ ...summary(r), reporter: r.reporter }));
 }
 
@@ -236,14 +230,14 @@ export async function getReport(id: string, wallet: string) {
 // ---------------------------------------------------------------- thread
 
 export async function addMessage(id: string, wallet: string, body: unknown, teamOnly: unknown) {
-  rateLimit(`message:${wallet}`, 60, 3600);
+  await rateLimit(`message:${wallet}`, 60, 3600);
   const { r, role } = await load(id, wallet);
   const text_ = text(body, "Message", 1, 10_000);
   const isTeam = role !== "researcher";
   if (teamOnly && !isTeam) fail(403, "Only the programme team can leave team-only notes.");
   const t = now();
-  db().prepare("INSERT INTO messages(report_id, author, role, team_only, body, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(r.id, wallet, isTeam ? "team" : "researcher", teamOnly && isTeam ? 1 : 0, text_, t);
-  db().prepare("UPDATE reports SET updated_at = ? WHERE id = ?").run(t, r.id);
+  await (await db()).run("INSERT INTO messages(report_id, author, role, team_only, body, created_at) VALUES (?, ?, ?, ?, ?, ?)", r.id, wallet, isTeam ? "team" : "researcher", teamOnly && isTeam ? 1 : 0, text_, t);
+  await (await db()).run("UPDATE reports SET updated_at = ? WHERE id = ?", t, r.id);
   return detail({ ...r, updated_at: t }, role);
 }
 
@@ -294,13 +288,11 @@ export async function triage(
   }
 
   const t = now();
-  tx(() => {
-    db()
-      .prepare("UPDATE reports SET status = ?, reason = ?, confirmed = ?, reward = ?, updated_at = ? WHERE id = ?")
-      .run(next, reason || null, confirmed, reward, t, r.id);
-    db().prepare("INSERT INTO report_history(report_id, status, actor, reason, at) VALUES (?, ?, ?, ?, ?)").run(r.id, next, wallet, reason || null, t);
+  await tx(async (q) => {
+    await q.run("UPDATE reports SET status = ?, reason = ?, confirmed = ?, reward = ?, updated_at = ? WHERE id = ?", next, reason || null, confirmed, reward, t, r.id);
+    await q.run("INSERT INTO report_history(report_id, status, actor, reason, at) VALUES (?, ?, ?, ?, ?)", r.id, next, wallet, reason || null, t);
   });
-  const fresh = db().prepare("SELECT * FROM reports WHERE id = ?").get(r.id) as Row;
+  const fresh = await (await db()).get("SELECT * FROM reports WHERE id = ?", r.id) as Row;
   return detail(fresh, role);
 }
 
@@ -336,18 +328,18 @@ export async function confirmPaid(id: string, wallet: string, txHash: string) {
   if (!match) fail(409, "That transaction did not pay this report's agreed reward to its payout wallet.");
 
   const t = now();
-  tx(() => {
-    db().prepare("UPDATE reports SET status = 'paid', payout_tx = ?, payout_block = ?, updated_at = ? WHERE id = ?").run(txHash.toLowerCase(), Number(receipt!.blockNumber), t, r.id);
-    db().prepare("INSERT INTO report_history(report_id, status, actor, at) VALUES (?, 'paid', ?, ?)").run(r.id, wallet, t);
+  await tx(async (q) => {
+    await q.run("UPDATE reports SET status = 'paid', payout_tx = ?, payout_block = ?, updated_at = ? WHERE id = ?", txHash.toLowerCase(), Number(receipt!.blockNumber), t, r.id);
+    await q.run("INSERT INTO report_history(report_id, status, actor, at) VALUES (?, 'paid', ?, ?)", r.id, wallet, t);
   });
-  return detail(db().prepare("SELECT * FROM reports WHERE id = ?").get(r.id) as Row, role);
+  return detail(await (await db()).get("SELECT * FROM reports WHERE id = ?", r.id) as Row, role);
 }
 
 // ---------------------------------------------------------------- attachments
 
-const ATTACH_DIR = path.join(process.cwd(), ".data", "attachments");
 const MAX_FILES = 5;
-const MAX_BYTES = 10 * 1024 * 1024;
+// Vercel functions take request bodies up to 4.5 MB, so files stop at 4 MB.
+const MAX_BYTES = 4 * 1024 * 1024;
 
 /** File type from the bytes, never from the name or the browser's claim. */
 function sniff(b: Buffer): string | null {
@@ -361,36 +353,32 @@ function sniff(b: Buffer): string | null {
 const safeName = (n: string) => (path.basename(n).replace(/[^\w.\- ]+/g, "_").slice(0, 100) || "file");
 
 export async function addAttachment(id: string, wallet: string, file: File) {
-  rateLimit(`upload:${wallet}`, 20, 3600);
+  await rateLimit(`upload:${wallet}`, 20, 3600);
   const { r } = await load(id, wallet);
-  const count = (db().prepare("SELECT COUNT(*) AS n FROM attachments WHERE report_id = ?").get(r.id) as { n: number }).n;
+  const count = (await (await db()).get("SELECT COUNT(*) AS n FROM attachments WHERE report_id = ?", r.id) as { n: number }).n;
   if (count >= MAX_FILES) fail(409, `A report can hold at most ${MAX_FILES} files.`);
-  if (file.size > MAX_BYTES) fail(413, "Files can be at most 10 MB.");
+  if (file.size > MAX_BYTES) fail(413, "Files can be at most 4 MB.");
   const bytes = Buffer.from(await file.arrayBuffer());
   const mime = sniff(bytes);
   if (!mime) fail(415, "Only PDF, PNG, JPEG and plain text files are accepted.");
-  mkdirSync(ATTACH_DIR, { recursive: true });
   const attId = `a${randomBytes(12).toString("hex")}`;
-  writeFileSync(path.join(ATTACH_DIR, attId), bytes, { mode: 0o600 });
-  db()
-    .prepare("INSERT INTO attachments(id, report_id, name, mime, size, file, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-    .run(attId, r.id, safeName(file.name), mime, bytes.length, attId, wallet, now());
+  await (await db()).run("INSERT INTO attachments(id, report_id, name, mime, size, data, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", attId, r.id, safeName(file.name), mime, bytes.length, bytes, wallet, now());
   return { id: attId, name: safeName(file.name), mime, size: bytes.length };
 }
 
 export async function readAttachment(attId: string, wallet: string) {
-  const a = db().prepare("SELECT * FROM attachments WHERE id = ?").get(attId) as
-    | { report_id: string; name: string; mime: string; file: string }
+  const a = await (await db()).get("SELECT report_id, name, mime, data FROM attachments WHERE id = ?", attId) as
+    | { report_id: string; name: string; mime: string; data: Uint8Array }
     | undefined;
   if (!a) fail(404, "File not found.");
   await load(a!.report_id, wallet); // same access rule as the report
-  return { name: a!.name, mime: a!.mime, bytes: readFileSync(path.join(ATTACH_DIR, a!.file)) };
+  return { name: a!.name, mime: a!.mime, bytes: Buffer.from(a!.data) };
 }
 
 // ---------------------------------------------------------------- triagers
 
-export function listTriagers(programmeId: number) {
-  return db().prepare("SELECT wallet, name FROM triagers WHERE chain_id = ? AND programme_id = ? ORDER BY created_at").all(CHAIN, programmeId) as {
+export async function listTriagers(programmeId: number) {
+  return await (await db()).all("SELECT wallet, name FROM triagers WHERE chain_id = ? AND programme_id = ? ORDER BY created_at", CHAIN, programmeId) as {
     wallet: string;
     name: string;
   }[];
@@ -401,86 +389,82 @@ export async function addTriager(programmeId: number, wallet: string, triager: s
   if (!ADDRESS.test(triager)) fail(400, "Not a wallet address.");
   const label = text(name, "Name", 1, 60);
   if (triager.toLowerCase() === wallet) fail(400, "The owner already has access.");
-  db()
-    .prepare("INSERT OR REPLACE INTO triagers(chain_id, programme_id, wallet, name, added_by, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(CHAIN, programmeId, triager.toLowerCase(), label, wallet, now());
-  audit(wallet, "Added triager", `programme ${programmeId}: ${triager.toLowerCase()}`, null);
+  await (await db()).run("INSERT OR REPLACE INTO triagers(chain_id, programme_id, wallet, name, added_by, created_at) VALUES (?, ?, ?, ?, ?, ?)", CHAIN, programmeId, triager.toLowerCase(), label, wallet, now());
+  await audit(wallet, "Added triager", `programme ${programmeId}: ${triager.toLowerCase()}`, null);
   return listTriagers(programmeId);
 }
 
 export async function removeTriager(programmeId: number, wallet: string, triager: string) {
   if ((await programmeOwner(programmeId)) !== wallet) fail(403, "Only the programme owner can remove triagers.");
-  db().prepare("DELETE FROM triagers WHERE chain_id = ? AND programme_id = ? AND wallet = ?").run(CHAIN, programmeId, triager.toLowerCase());
-  audit(wallet, "Removed triager", `programme ${programmeId}: ${triager.toLowerCase()}`, null);
+  await (await db()).run("DELETE FROM triagers WHERE chain_id = ? AND programme_id = ? AND wallet = ?", CHAIN, programmeId, triager.toLowerCase());
+  await audit(wallet, "Removed triager", `programme ${programmeId}: ${triager.toLowerCase()}`, null);
   return listTriagers(programmeId);
 }
 
 // ---------------------------------------------------------------- moderation
 
-export function audit(actor: string, action: string, target: string, reason: string | null) {
-  db().prepare("INSERT INTO audit(at, actor, action, target, reason) VALUES (?, ?, ?, ?, ?)").run(now(), actor, action, target, reason);
+export async function audit(actor: string, action: string, target: string, reason: string | null, q?: Q) {
+  await (q ?? (await db())).run("INSERT INTO audit(at, actor, action, target, reason) VALUES (?, ?, ?, ?, ?)", now(), actor, action, target, reason);
 }
 
-export const isHidden = (programmeId: number) =>
-  !!db().prepare("SELECT 1 FROM hidden_programmes WHERE chain_id = ? AND programme_id = ?").get(CHAIN, programmeId);
+export const isHidden = async (programmeId: number) =>
+  !!(await (await db()).get("SELECT 1 FROM hidden_programmes WHERE chain_id = ? AND programme_id = ?", CHAIN, programmeId));
 
-export function hiddenProgrammeIds(): number[] {
-  return (db().prepare("SELECT programme_id FROM hidden_programmes WHERE chain_id = ?").all(CHAIN) as { programme_id: number }[]).map((r) => r.programme_id);
+export async function hiddenProgrammeIds(): Promise<number[]> {
+  return (await (await db()).all("SELECT programme_id FROM hidden_programmes WHERE chain_id = ?", CHAIN) as { programme_id: number }[]).map((r) => r.programme_id);
 }
 
-export function createAbuse(wallet: string, input: { targetKind: string; target: string; reason: string }) {
-  rateLimit(`abuse:${wallet}`, 5, 24 * 3600);
+export async function createAbuse(wallet: string, input: { targetKind: string; target: string; reason: string }) {
+  await rateLimit(`abuse:${wallet}`, 5, 24 * 3600);
   if (input.targetKind !== "programme" && input.targetKind !== "report") fail(400, "Report a programme or a report.");
   const target = text(input.target, "Target", 1, 80);
   const reason = text(input.reason, "Reason", 10, 2000);
   const id = `AB-${randomBytes(4).toString("hex")}`;
-  db().prepare("INSERT INTO abuse(id, target_kind, target, reason, reporter, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(id, input.targetKind, target, reason, wallet, now());
+  await (await db()).run("INSERT INTO abuse(id, target_kind, target, reason, reporter, created_at) VALUES (?, ?, ?, ?, ?, ?)", id, input.targetKind, target, reason, wallet, now());
   return { id };
 }
 
-export function listAbuse(wallet: string) {
+export async function listAbuse(wallet: string) {
   if (!isAdmin(wallet)) fail(403, "This area is for platform administrators.");
   return {
-    queue: db().prepare("SELECT id, target_kind AS targetKind, target, reason, reporter, status, created_at AS at FROM abuse ORDER BY created_at").all(),
-    audit: db().prepare("SELECT at, actor, action, target, reason FROM audit ORDER BY id DESC LIMIT 200").all(),
+    queue: await (await db()).all("SELECT id, target_kind AS targetKind, target, reason, reporter, status, created_at AS at FROM abuse ORDER BY created_at"),
+    audit: await (await db()).all("SELECT at, actor, action, target, reason FROM audit ORDER BY id DESC LIMIT 200"),
     // Counts only. Administrators never see report contents.
-    counts: db()
-      .prepare(
+    counts: await (await db()).get(
         `SELECT COUNT(*) AS reports,
                 SUM(status IN ('submitted','triage','needs_information')) AS open,
                 SUM(status IN ('reward_agreed','paid')) AS accepted,
                 COUNT(DISTINCT reporter) AS researchers
-         FROM reports WHERE chain_id = ?`,
-      )
-      .get(CHAIN),
+         FROM reports WHERE chain_id = ?`, CHAIN),
   };
 }
 
-export function decideAbuse(wallet: string, id: string, action: string, reason: string) {
+export async function decideAbuse(wallet: string, id: string, action: string, reason: string) {
   if (!isAdmin(wallet)) fail(403, "This area is for platform administrators.");
-  const a = db().prepare("SELECT * FROM abuse WHERE id = ?").get(id) as { id: string; target_kind: string; target: string; status: string } | undefined;
+  const a = await (await db()).get("SELECT * FROM abuse WHERE id = ?", id) as { id: string; target_kind: string; target: string; status: string } | undefined;
   if (!a) fail(404, "Abuse report not found.");
   if (a!.status !== "open") fail(409, "Already decided.");
   if (action !== "hide" && action !== "dismiss") fail(400, "Hide or dismiss.");
   const why = text(reason, "Reason", 10, 2000);
-  tx(() => {
-    db().prepare("UPDATE abuse SET status = ? WHERE id = ?").run(action === "hide" ? "hidden" : "dismissed", id);
+  await tx(async (q) => {
+    await q.run("UPDATE abuse SET status = ? WHERE id = ?", action === "hide" ? "hidden" : "dismissed", id);
     if (action === "hide" && a!.target_kind === "programme" && /^\d+$/.test(a!.target)) {
-      db().prepare("INSERT OR REPLACE INTO hidden_programmes(chain_id, programme_id, reason, at) VALUES (?, ?, ?, ?)").run(CHAIN, Number(a!.target), why, now());
+      await q.run("INSERT OR REPLACE INTO hidden_programmes(chain_id, programme_id, reason, at) VALUES (?, ?, ?, ?)", CHAIN, Number(a!.target), why, now());
     }
     if (action === "hide" && a!.target_kind === "report") {
       // Closes the submission without anyone reading it: status only, contents untouched.
-      const rep = db().prepare("SELECT id, status FROM reports WHERE ref = ? AND chain_id = ?").get(a!.target, CHAIN) as { id: string; status: string } | undefined;
+      const rep = await q.get("SELECT id, status FROM reports WHERE ref = ? AND chain_id = ?", a!.target, CHAIN) as { id: string; status: string } | undefined;
       if (rep && rep.status !== "paid" && rep.status !== "reward_agreed") {
-        db().prepare("UPDATE reports SET status = 'invalid', reason = 'Closed by platform moderation as spam.', updated_at = ? WHERE id = ?").run(now(), rep.id);
-        db().prepare("INSERT INTO report_history(report_id, status, actor, reason, at) VALUES (?, 'invalid', ?, 'Closed by platform moderation as spam.', ?)").run(rep.id, wallet, now());
+        await q.run("UPDATE reports SET status = 'invalid', reason = 'Closed by platform moderation as spam.', updated_at = ? WHERE id = ?", now(), rep.id);
+        await q.run("INSERT INTO report_history(report_id, status, actor, reason, at) VALUES (?, 'invalid', ?, 'Closed by platform moderation as spam.', ?)", rep.id, wallet, now());
       }
     }
-    audit(
+    await audit(
       wallet,
       action === "dismiss" ? `Dismissed abuse report ${id}` : a!.target_kind === "programme" ? "Hid programme from directory" : "Rejected report as spam",
       a!.target,
       why,
+      q,
     );
   });
   return listAbuse(wallet);

@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # Browser end-to-end test of the full live flow (submit → triage → reply → reward → release → paid →
-# moderation) on an anvil fork of Bohr with a throwaway database. Needs Foundry and Chrome/Edge.
+# moderation) on an anvil fork of BOT Chain mainnet with a throwaway database. Needs Foundry and Chrome/Edge.
 set -e
 cd "$(dirname "$0")/.."
 
@@ -16,9 +16,8 @@ APP_PORT=3500
 RUN=".data/ui-$(date +%s)"
 mkdir -p "$RUN"
 
-export NEXT_PUBLIC_SEHAT_NETWORK=testnet
-export NEXT_PUBLIC_SEHAT_ESCROW=0xbC555De32fb45a8FF3297cbbc1a6F50F7674Bb54
-export NEXT_PUBLIC_SEHAT_ESCROW_BLOCK=27529541
+export NEXT_PUBLIC_SEHAT_ESCROW=0xD438c5aF89538Dc8a00ABCFB688c42ebBAA0463D
+export NEXT_PUBLIC_SEHAT_ESCROW_BLOCK=27949448
 export NEXT_PUBLIC_SEHAT_REPORTS=live
 export NEXT_PUBLIC_SEHAT_RPC=http://127.0.0.1:$FORK_PORT
 export SEHAT_DB_FILE="$RUN/sehat.db"
@@ -28,7 +27,7 @@ export OUT="${OUT:-$RUN}"
 
 for p in $APP_PORT $FORK_PORT; do port_busy $p && { echo "port $p is in use; stop it first"; exit 1; }; done
 
-anvil --silent --port $FORK_PORT --fork-url https://rpc.bohr.life &
+anvil --silent --port $FORK_PORT --fork-url https://rpc.botchain.ai &
 ANVIL=$!
 for i in $(seq 1 30); do cast chain-id --rpc-url $NEXT_PUBLIC_SEHAT_RPC >/dev/null 2>&1 && break; sleep 1; done
 ACCOUNTS=$(cast rpc eth_accounts --rpc-url $NEXT_PUBLIC_SEHAT_RPC)

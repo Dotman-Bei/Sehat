@@ -17,7 +17,7 @@ export const GET = handle(async (req, { params }: P) => {
   const who = requireSession(req);
   const id = await idOf(params);
   if (!(await teamRole(id, who))) fail(403, "Only the programme team can see its triagers.");
-  return json({ triagers: listTriagers(id) });
+  return json({ triagers: await listTriagers(id) });
 });
 
 export const POST = handle(async (req, { params }: P) => {

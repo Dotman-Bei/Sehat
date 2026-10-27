@@ -9,5 +9,5 @@ export const POST = handle(async (req, { params }: { params: Promise<{ id: strin
   requireLive();
   const who = requireSession(req);
   const { action, reason } = await readJson<{ action?: string; reason?: string }>(req);
-  return json(decideAbuse(who, (await params).id, String(action ?? ""), String(reason ?? "")));
+  return json(await decideAbuse(who, (await params).id, String(action ?? ""), String(reason ?? "")));
 });

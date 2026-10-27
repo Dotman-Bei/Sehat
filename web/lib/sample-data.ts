@@ -131,7 +131,7 @@ export const ESCROW_CONTRACT = addr("sehat-escrow");
 export const LATEST_BLOCK = 1_284_601;
 
 const STANDARD_RULES = [
-  "Test only against the contracts and hosts listed in scope, on Bohr testnet or a local fork. Never against mainnet funds that are not your own.",
+  "Test only against the contracts and hosts listed in scope, on a local fork. Never against funds that are not your own.",
   "No denial-of-service, spam, or load testing. No destructive tests, data exfiltration, privacy violations or social engineering of staff or users.",
   "If you reach personal data or keys by accident, stop, keep no copy, and say so in the report.",
   "Give the team the time in the disclosure window before you publish anything. Public disclosure needs both sides to agree.",
@@ -146,7 +146,7 @@ export const PROGRAMMES: Programme[] = [
     owner: addr("quayside-owner"),
     startDate: "2026-08-04",
     closingWindowDays: 30,
-    summary: "The relayer and on-chain proof verifier that move BOT between Bohr testnet and mainnet.",
+    summary: "The relayer and on-chain proof verifier that move BOT between BOT Chain and Ethereum.",
     scope: [
       { target: "ProofVerifier.sol", kind: "Smart contract", note: "Verification of batch proofs and epoch rollover" },
       { target: "BridgeVault.sol", kind: "Smart contract", note: "Locking and release of bridged BOT" },
@@ -167,7 +167,7 @@ export const PROGRAMMES: Programme[] = [
       { severity: "Informational", min: 0, max: 200, example: "Gas improvements and documentation errors" },
     ],
     rules: STANDARD_RULES,
-    automatedScanning: "Allowed against the testnet deployment at up to 5 requests a second. Not against the relayer's production endpoints.",
+    automatedScanning: "Allowed against a local fork at up to 5 requests a second. Not against the relayer's production endpoints.",
     disclosure: "90 days from the first report, or sooner if a fix ships and both sides agree.",
     duplicates: "The earliest complete report wins. Later reports of the same root cause close as duplicates without reward.",
     events: [
@@ -434,7 +434,7 @@ export const getProgramme = (id: string) => PROGRAMMES.find((p) => p.id === id);
 // ---- reports ----------------------------------------------------------------------------------
 
 const other = (seed: string) => addr(`researcher-${seed}`);
-const steps3 = ["Fork Bohr testnet at the block in the attachment.", "Run the attached script against the listed contract.", "Compare the result with the expected value in the notes."];
+const steps3 = ["Fork BOT Chain at the block in the attachment.", "Run the attached script against the listed contract.", "Compare the result with the expected value in the notes."];
 
 export const REPORTS: Report[] = [
   {
@@ -478,7 +478,7 @@ export const REPORTS: Report[] = [
     digest: fakeHex("digest-0157"),
     impact: "A proof signed by the outgoing validator set is still accepted for one block after the epoch changes, so a batch can be released twice.",
     steps: [
-      "Fork Bohr testnet at block 1,251,900, two blocks before the epoch change.",
+      "Fork BOT Chain at block 1,251,900, two blocks before the epoch change.",
       "Submit batch 88412 with its original proof through the relayer.",
       "After the rollover block, submit the same proof again. BridgeVault releases the batch a second time.",
     ],
@@ -489,7 +489,7 @@ export const REPORTS: Report[] = [
     thread: [
       { from: "team", author: "Kemi Okafor", date: "2026-10-05", body: "Thank you. We reproduced it on a fork and have paused batch submission while we patch." },
       { from: "team", author: "Kemi Okafor", date: "2026-10-05", body: "Patch adds the epoch to the proof domain. Arvid to review before deploy.", teamOnly: true },
-      { from: "team", author: "Arvid Lund", date: "2026-10-14", body: "Fix deployed to testnet. Confirming Critical. We propose 30,000 BOT, the bottom of the range, because the window is one block." },
+      { from: "team", author: "Arvid Lund", date: "2026-10-14", body: "Fix deployed to a fork. Confirming Critical. We propose 30,000 BOT, the bottom of the range, because the window is one block." },
       { from: "researcher", author: "You", date: "2026-10-16", body: "Accepted. Payout wallet is the one this report was submitted from." },
     ],
   },
@@ -507,7 +507,7 @@ export const REPORTS: Report[] = [
     digest: fakeHex("digest-0163"),
     impact: "The bonus is priced before the staleness check runs, so a liquidator can seize collateral at a price up to one heartbeat old.",
     steps: [
-      "Fork Bohr testnet and let the Kestrel feed go 50 minutes without an update.",
+      "Fork BOT Chain and let the Kestrel feed go 50 minutes without an update.",
       "Move the spot price 6% on the fork's pool.",
       "Call liquidate() on a position that is healthy at the fresh price. The bonus uses the stale price.",
     ],

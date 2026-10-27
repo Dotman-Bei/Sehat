@@ -27,7 +27,7 @@ export default async function ResearcherPage() {
     );
   }
 
-  const summaries = listMine(who) as ApiSummary[];
+  const summaries = (await listMine(who)) as ApiSummary[];
   // The team's latest question is shown on the dashboard, so load the thread of reports that wait on the researcher.
   const reports = await Promise.all(
     summaries.map(async (sum) =>

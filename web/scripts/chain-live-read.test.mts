@@ -1,4 +1,4 @@
-// Reads programme 1 from the live Bohr testnet deployment through the app's own data layer.
+// Reads programme 1 (a test programme) from the live BOT Chain mainnet deployment through the app's own data layer.
 // Run: npx tsx scripts/chain-live-read.test.mts   (env set by scripts/test-chain.sh)
 import assert from "node:assert/strict";
 
@@ -14,8 +14,8 @@ console.log("  events", p.events.map((e) => `${e.kind} ${e.amount} @${e.block}`)
 
 assert.equal(p.onChain?.metadataStatus, "verified", "metadata matches the on-chain hash");
 assert.equal(p.test, true);
-assert.equal(funded(p), 0.1);
-assert.ok(paidOut(p) >= 0.02);
+assert.ok(funded(p) >= 0.001);
+assert.ok(paidOut(p) >= 0.0009);
 assert.equal(Math.round((funded(p) - paidOut(p) - balance(p)) * 1e6), 0, "funded - paid = balance");
 const ev = p.events.map((e) => e.kind);
 assert.ok(ev.includes("funded") && ev.includes("paid"), "funding and payout events read");

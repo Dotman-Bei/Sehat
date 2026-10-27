@@ -135,7 +135,7 @@ export async function listProgrammes(): Promise<Programme[]> {
   if (!REPORTS_LIVE) return all;
   // Programmes hidden by moderation leave the directory; their pages and escrow stay reachable.
   const { hiddenProgrammeIds } = await import("@/server/moderation");
-  const hidden = new Set(hiddenProgrammeIds());
+  const hidden = new Set(await hiddenProgrammeIds());
   return all.filter((p) => !hidden.has(p.onChain!.programmeId));
 }
 

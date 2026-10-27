@@ -19,7 +19,7 @@ export default async function AdminPage() {
   const admin = isAdmin(who);
   let live: LiveModeration = { signedIn: !!who, admin, queue: [], audit: [], counts: { reports: 0, open: 0, accepted: 0, researchers: 0 } };
   if (admin) {
-    const data = listAbuse(who!) as {
+    const data = (await listAbuse(who!)) as unknown as {
       queue: { id: string; targetKind: "programme" | "report"; target: string; reason: string; reporter: string; status: "open" | "hidden" | "dismissed"; at: number }[];
       audit: { at: number; actor: string; action: string; target: string; reason: string | null }[];
       counts: { reports: number; open: number | null; accepted: number | null; researchers: number };

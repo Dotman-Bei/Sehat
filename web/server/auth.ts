@@ -31,17 +31,17 @@ function secret(): Buffer {
 const b64 = (b: Buffer | string) => Buffer.from(b).toString("base64url");
 const sign = (payload: string) => createHmac("sha256", secret()).update(payload).digest("base64url");
 
-export function issueNonce(req: Request): string {
-  rateLimit(`nonce:${clientIp(req)}`, 30, 10 * 60);
+export async function issueNonce(req: Request): Promise<string> {
+  await rateLimit(`nonce:${clientIp(req)}`, 30, 10 * 60);
   const nonce = randomBytes(16).toString("hex");
-  db().prepare("INSERT INTO nonces(nonce, created_at) VALUES (?, ?)").run(nonce, now());
-  db().prepare("DELETE FROM nonces WHERE created_at < ?").run(now() - 24 * 3600);
+  await (await db()).run("INSERT INTO nonces(nonce, created_at) VALUES (?, ?)", nonce, now());
+  await (await db()).run("DELETE FROM nonces WHERE created_at < ?", now() - 24 * 3600);
   return nonce;
 }
 
 /** Verifies a signed SIWE message for this site and returns the signer (lowercase). */
 export async function verifySignIn(req: Request, message: string, signature: `0x${string}`): Promise<string> {
-  rateLimit(`signin:${clientIp(req)}`, 20, 10 * 60);
+  await rateLimit(`signin:${clientIp(req)}`, 20, 10 * 60);
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
   const fields = parseSiweMessage(message);
   if (!fields.address || !fields.nonce || !fields.domain) fail(400, "The sign-in message is incomplete.");
@@ -50,14 +50,14 @@ export async function verifySignIn(req: Request, message: string, signature: `0x
   const issued = fields.issuedAt ? Math.floor(fields.issuedAt.getTime() / 1000) : 0;
   if (Math.abs(now() - issued) > NONCE_SECONDS) fail(400, "The sign-in message has expired. Try again.");
 
-  const row = db().prepare("SELECT created_at, used FROM nonces WHERE nonce = ?").get(fields.nonce!) as { created_at: number; used: number } | undefined;
+  const row = await (await db()).get("SELECT created_at, used FROM nonces WHERE nonce = ?", fields.nonce!) as { created_at: number; used: number } | undefined;
   if (!row || row.used || now() - row.created_at > NONCE_SECONDS) fail(400, "The sign-in request has expired. Try again.");
 
   // Works for ordinary wallets and smart-contract wallets (ERC-1271 / ERC-6492).
   const ok = await publicClient.verifySiweMessage({ message, signature, domain: host, nonce: fields.nonce });
   if (!ok) fail(401, "The signature does not match the wallet.");
 
-  db().prepare("UPDATE nonces SET used = 1 WHERE nonce = ?").run(fields.nonce!);
+  await (await db()).run("UPDATE nonces SET used = 1 WHERE nonce = ?", fields.nonce!);
   return fields.address!.toLowerCase();
 }
 
